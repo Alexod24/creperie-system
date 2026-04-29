@@ -48,13 +48,18 @@ export default function SignInForm() {
       </div>
       <div className="flex flex-col justify-center flex-1 w-full max-w-md mx-auto">
         <div>
-          <div className="mb-5 sm:mb-8">
-            <h1 className="mb-2 font-semibold text-gray-800 text-title-sm dark:text-white/90 sm:text-title-md">
-              Sign In
-            </h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              Enter your email and password to sign in!
-            </p>
+          <div className="mb-5 sm:mb-8 flex items-center justify-center sm:justify-start space-x-4">
+            <div className="w-20 h-20 relative flex-shrink-0">
+              <img src="/images/logo.png" alt="Gustitos del Virrey" className="w-full h-full object-contain" />
+            </div>
+            <div>
+              <h1 className="mb-1 font-bold text-gray-800 text-2xl dark:text-white/90">
+                Gustitos del Virrey
+              </h1>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Ingresa tus credenciales para acceder.
+              </p>
+            </div>
           </div>
           <div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-5">

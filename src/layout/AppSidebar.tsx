@@ -99,14 +99,14 @@ const AppSidebar: React.FC = () => {
       onMouseLeave={() => setIsHovered(false)}
     >
       {/* Logo Area */}
-      <div className="p-4 flex items-center space-x-3">
-        <div className="flex items-center justify-center w-8 h-8 bg-purple-600 rounded-md shrink-0">
-          <div className="w-4 h-4 bg-white rounded-full opacity-50 relative flex items-center justify-center">
-            <div className="w-2 h-2 bg-purple-600 rounded-full"></div>
-          </div>
+      <div className={`p-4 flex items-center ${isExpanded || isHovered || isMobileOpen ? 'space-x-3 justify-start' : 'justify-center'}`}>
+        <div className="relative w-10 h-10 flex-shrink-0">
+          <img src="/images/logo.png" alt="Logo" className="w-full h-full object-contain" />
         </div>
         {(isExpanded || isHovered || isMobileOpen) && (
-          <span className="font-semibold text-gray-900 text-lg">Untitled UI</span>
+          <span className="font-bold text-gray-900 dark:text-white text-lg leading-tight">
+            Gustitos del Virrey
+          </span>
         )}
       </div>
 

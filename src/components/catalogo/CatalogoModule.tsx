@@ -1,0 +1,122 @@
+"use client";
+
+import React, { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabaseClient";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import Badge from "@/components/ui/badge/Badge";
+
+type Product = {
+  id: number;
+  name: string;
+  price: number;
+  image_url: string | null;
+  stock: number;
+  is_active: boolean;
+};
+
+export default function CatalogoModule() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchProducts();
+  }, []);
+
+  const fetchProducts = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("products")
+      .select("*")
+      .order("name");
+    
+    if (data) {
+      setProducts(data);
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/[0.05] dark:bg-white/[0.03]">
+      <div className="max-w-full overflow-x-auto">
+        <div className="min-w-[800px]">
+          <Table>
+            <TableHeader className="border-b border-gray-100 dark:border-white/[0.05]">
+              <TableRow>
+                <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">
+                  ID
+                </TableCell>
+                <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">
+                  Postre
+                </TableCell>
+                <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">
+                  Precio (S/)
+                </TableCell>
+                <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">
+                  Stock Disp.
+                </TableCell>
+                <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">
+                  Estado
+                </TableCell>
+              </TableRow>
+            </TableHeader>
+            <TableBody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
+              {loading ? (
+                <TableRow>
+                  <TableCell className="px-5 py-4 text-center text-gray-500" colSpan={5}>
+                    Cargando catálogo...
+                  </TableCell>
+                </TableRow>
+              ) : products.length === 0 ? (
+                <TableRow>
+                  <TableCell className="px-5 py-4 text-center text-gray-500" colSpan={5}>
+                    No hay postres registrados en el catálogo.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                products.map((item) => (
+                  <TableRow key={item.id}>
+                    <TableCell className="px-5 py-4 text-start text-theme-sm text-gray-500 dark:text-gray-400">
+                      {item.id}
+                    </TableCell>
+                    <TableCell className="px-5 py-4 text-start text-theme-sm font-medium text-gray-800 dark:text-white">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-200 shrink-0">
+                          {item.image_url ? (
+                            <img src={item.image_url} alt={item.name} className="w-full h-full object-cover" />
+                          ) : null}
+                        </div>
+                        {item.name}
+                      </div>
+                    </TableCell>
+                    <TableCell className="px-5 py-4 text-start text-theme-sm text-gray-500 dark:text-gray-400">
+                      {item.price.toFixed(2)}
+                    </TableCell>
+                    <TableCell className="px-5 py-4 text-start text-theme-sm text-gray-500 dark:text-gray-400">
+                      {item.stock ?? 0}
+                    </TableCell>
+                    <TableCell className="px-5 py-4 text-start text-theme-sm">
+                      <Badge
+                        size="sm"
+                        color={
+                          item.is_active ? "success" : "error"
+                        }
+                      >
+                        {item.is_active ? "Activo" : "Inactivo"}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+    </div>
+  );
+}

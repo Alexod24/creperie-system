@@ -11,6 +11,7 @@ type Product = {
   name: string;
   price: number;
   image_url: string | null;
+  stock: number;
   is_active: boolean;
 };
 
@@ -115,8 +116,17 @@ export default function PosModule() {
 
       if (itemsError) throw itemsError;
 
+      // 3. Descontar stock de productos
+      for (const item of cart) {
+        await supabase.rpc('decrement_product_stock', {
+          p_product_id: item.id,
+          p_quantity: item.quantity
+        });
+      }
+
       alert("Venta registrada exitosamente");
       setCart([]); // Limpiar carrito
+      fetchProducts(); // Refrescar stock
     } catch (error) {
       console.error("Error al procesar la venta:", error);
       alert("Hubo un error al procesar la venta.");
@@ -141,9 +151,12 @@ export default function PosModule() {
             products.map((prod) => (
               <div
                 key={prod.id}
-                onClick={() => addToCart(prod)}
-                className="group cursor-pointer flex flex-col rounded-xl border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 hover:border-brand-500 transition-colors overflow-hidden h-40 relative"
+                onClick={() => prod.stock > 0 && addToCart(prod)}
+                className={`group flex flex-col rounded-xl border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 hover:border-brand-500 transition-colors overflow-hidden h-40 relative ${prod.stock > 0 ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}
               >
+                <div className={`absolute top-2 right-2 text-white text-xs px-2 py-1 rounded-full z-10 ${prod.stock > 0 ? 'bg-black/60' : 'bg-red-500'}`}>
+                  Stock: {prod.stock ?? 0}
+                </div>
                 <div className="flex-1 bg-gray-200 dark:bg-gray-800 flex items-center justify-center relative">
                   {prod.image_url ? (
                     <img src={prod.image_url} alt={prod.name} className="object-cover w-full h-full" />
