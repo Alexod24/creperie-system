@@ -29,7 +29,7 @@ export default function InventoryModule() {
 
   const fetchIngredients = async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from("ingredients")
       .select("*")
       .order("name");

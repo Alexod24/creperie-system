@@ -1,0 +1,357 @@
+"use client";
+
+import React, { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabaseClient";
+import { useParams } from "next/navigation";
+import { 
+  ChevronLeft, 
+  Trash2, 
+  Plus, 
+  Save, 
+  Info,
+  Scale,
+  Clock,
+  ChevronRight
+} from "lucide-react";
+import Link from "next/link";
+import { useAuth } from "@/context/AuthContext";
+
+type Product = {
+  id: number;
+  name: string;
+  price: number;
+  image_url: string | null;
+};
+
+type Ingredient = {
+  id: number;
+  name: string;
+  unit: string;
+};
+
+type RecipeItem = {
+  id: number;
+  ingredient_id: number;
+  quantity_required: number;
+  ingredients: Ingredient;
+};
+
+export default function RecetarioDetail() {
+  const { id } = useParams();
+  const { role } = useAuth();
+  
+  const [product, setProduct] = useState<Product | null>(null);
+  const [recipe, setRecipe] = useState<RecipeItem[]>([]);
+  const [allIngredients, setAllIngredients] = useState<Ingredient[]>([]);
+  const [loading, setLoading] = useState(true);
+  
+  // States for adding new ingredient
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newIngredientId, setNewIngredientId] = useState<string>("");
+  const [newQuantity, setNewQuantity] = useState<string>("");
+
+  useEffect(() => {
+    if (id) {
+      fetchData(Number(id));
+    }
+  }, [id]);
+
+  const fetchData = async (productId: number) => {
+    setLoading(true);
+    try {
+      // 1. Fetch Product
+      const { data: prodData } = await supabase
+        .from("products")
+        .select("*")
+        .eq("id", productId)
+        .single();
+      
+      if (prodData) setProduct(prodData);
+
+      // 2. Fetch Recipe
+      const { data: recipeData } = await supabase
+        .from("recipes")
+        .select(`
+          id,
+          ingredient_id,
+          quantity_required,
+          ingredients ( id, name, unit )
+        `)
+        .eq("product_id", productId);
+      
+      if (recipeData) {
+        setRecipe(recipeData as unknown as RecipeItem[]);
+      }
+
+      // 3. Fetch all ingredients (for dropdown)
+      const { data: ingData } = await supabase
+        .from("ingredients")
+        .select("*")
+        .order("name");
+      
+      if (ingData) setAllIngredients(ingData);
+
+    } catch (err) {
+      console.error("Error fetching data:", err);
+    }
+    setLoading(false);
+  };
+
+  const handleAddIngredient = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newIngredientId || !newQuantity || !product) return;
+
+    try {
+      const { error } = await supabase
+        .from("recipes")
+        .insert({
+          product_id: product.id,
+          ingredient_id: Number(newIngredientId),
+          quantity_required: Number(newQuantity)
+        });
+
+      if (error) throw error;
+      
+      // Refresh
+      fetchData(product.id);
+      setShowAddModal(false);
+      setNewIngredientId("");
+      setNewQuantity("");
+    } catch (err) {
+      alert("Error al añadir ingrediente. Tal vez ya existe en la receta.");
+      console.error(err);
+    }
+  };
+
+  const handleRemoveIngredient = async (recipeId: number) => {
+    if (!confirm("¿Seguro que quieres quitar este insumo de la receta?")) return;
+
+    try {
+      const { error } = await supabase
+        .from("recipes")
+        .delete()
+        .eq("id", recipeId);
+
+      if (error) throw error;
+      
+      setRecipe(prev => prev.filter(item => item.id !== recipeId));
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-4">
+        <div className="w-12 h-12 border-4 border-brand-200 border-t-brand-600 rounded-full animate-spin"></div>
+        <p className="text-gray-500 font-medium">Analizando receta...</p>
+      </div>
+    );
+  }
+
+  if (!product) return <div>Producto no encontrado</div>;
+
+  return (
+    <div className="max-w-6xl mx-auto pb-20">
+      {/* Header / Breadcrumbs */}
+      <div className="flex items-center gap-3 mb-8">
+        <Link 
+          href="/recetario" 
+          className="p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+        >
+          <ChevronLeft className="w-5 h-5 text-gray-600" />
+        </Link>
+        <div>
+          <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-1">
+            <span>Recetario</span>
+            <ChevronRight className="w-3 h-3" />
+            <span>Detalle</span>
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{product.name}</h1>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Left Column: Product Overview */}
+        <div className="lg:col-span-1 space-y-6">
+          <div className="bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 overflow-hidden shadow-sm">
+            <div className="aspect-square relative overflow-hidden bg-gray-50 dark:bg-gray-900">
+              {product.image_url ? (
+                <img 
+                  src={product.image_url} 
+                  alt={product.name} 
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center text-gray-300">
+                  <Info className="w-16 h-16 opacity-10" />
+                </div>
+              )}
+            </div>
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <span className="px-3 py-1 bg-green-50 dark:bg-green-500/10 text-green-600 dark:text-green-400 text-xs font-bold rounded-full uppercase tracking-wider">
+                  Configurado
+                </span>
+                <span className="text-xl font-bold text-gray-900 dark:text-white">
+                  S/ {product.price.toFixed(2)}
+                </span>
+              </div>
+              <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
+                Esta receta define cuántos insumos se descontarán automáticamente del almacén cada vez que se prepare una porción de este producto.
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-brand-600 rounded-3xl p-6 text-white shadow-lg shadow-brand-500/20 relative overflow-hidden">
+            <div className="relative z-10">
+              <h3 className="font-bold text-lg mb-2 flex items-center gap-2">
+                <Clock className="w-5 h-5" />
+                Automatización
+              </h3>
+              <p className="text-white/80 text-sm">
+                Al usar el módulo de &quot;Preparación&quot;, el sistema calculará en base a estos datos cuánto descontar de cada insumo.
+              </p>
+            </div>
+            <div className="absolute -bottom-6 -right-6 w-24 h-24 bg-white/10 rounded-full blur-2xl"></div>
+          </div>
+        </div>
+
+        {/* Right Column: Ingredients Table */}
+        <div className="lg:col-span-2 space-y-6">
+          <div className="bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
+            <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-gray-900 dark:text-white">Lista de Insumos</h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Cantidades por unidad de producto.</p>
+              </div>
+              
+              {role === 'admin' && (
+                <button 
+                  onClick={() => setShowAddModal(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-900 dark:bg-brand-600 text-white rounded-xl hover:opacity-90 transition-opacity font-medium text-sm shadow-md"
+                >
+                  <Plus className="w-4 h-4" />
+                  Agregar Insumo
+                </button>
+              )}
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-gray-50 dark:bg-gray-900/50">
+                    <th className="px-6 py-4 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Insumo</th>
+                    <th className="px-6 py-4 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Cantidad</th>
+                    <th className="px-6 py-4 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Unidad</th>
+                    {role === 'admin' && <th className="px-6 py-4 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider text-right">Acciones</th>}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                  {recipe.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="px-6 py-20 text-center text-gray-400 italic">
+                        Esta receta aún no tiene insumos asignados.
+                      </td>
+                    </tr>
+                  ) : (
+                    recipe.map((item) => (
+                      <tr key={item.id} className="group hover:bg-gray-50 dark:hover:bg-gray-900/30 transition-colors">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
+                              <Scale className="w-4 h-4 text-gray-400" />
+                            </div>
+                            <span className="font-semibold text-gray-800 dark:text-gray-200">{item.ingredients?.name}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 font-bold text-gray-900 dark:text-white">
+                          {item.quantity_required}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 uppercase">
+                          {item.ingredients?.unit}
+                        </td>
+                        {role === 'admin' && (
+                          <td className="px-6 py-4 text-right">
+                            <button 
+                              onClick={() => handleRemoveIngredient(item.id)}
+                              className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all rounded-lg"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </td>
+                        )}
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Add Ingredient Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-gray-800 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="p-6 bg-gray-50 dark:bg-gray-900 border-b border-gray-100 dark:border-gray-700">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white">Añadir Insumo</h3>
+              <p className="text-sm text-gray-500">Define qué insumo requiere esta receta.</p>
+            </div>
+            
+            <form onSubmit={handleAddIngredient} className="p-6 space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Seleccionar Insumo</label>
+                <select 
+                  className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-brand-500 text-sm"
+                  value={newIngredientId}
+                  onChange={(e) => setNewIngredientId(e.target.value)}
+                  required
+                >
+                  <option value="">Selecciona un insumo...</option>
+                  {allIngredients
+                    .filter(ing => !recipe.some(r => r.ingredient_id === ing.id))
+                    .map(ing => (
+                      <option key={ing.id} value={ing.id}>{ing.name} ({ing.unit})</option>
+                    ))
+                  }
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-gray-700 dark:text-gray-300">Cantidad Necesaria</label>
+                <input 
+                  type="number" 
+                  step="0.01"
+                  placeholder="Ej: 0.5 o 100"
+                  className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-brand-500 text-sm"
+                  value={newQuantity}
+                  onChange={(e) => setNewQuantity(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button 
+                  type="button" 
+                  onClick={() => setShowAddModal(false)}
+                  className="flex-1 px-4 py-3 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-xl font-bold text-sm hover:bg-gray-200 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit" 
+                  className="flex-1 px-4 py-3 bg-brand-600 text-white rounded-xl font-bold text-sm hover:bg-brand-700 shadow-lg shadow-brand-500/20 transition-all flex items-center justify-center gap-2"
+                >
+                  <Save className="w-4 h-4" />
+                  Guardar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

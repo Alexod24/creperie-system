@@ -10,6 +10,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import Badge from "@/components/ui/badge/Badge";
+import { useAuth } from "@/context/AuthContext";
+import { Plus } from "lucide-react";
+import CreateProductModal from "./CreateProductModal";
 
 type Product = {
   id: number;
@@ -23,6 +26,8 @@ type Product = {
 export default function CatalogoModule() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const { role } = useAuth();
 
   useEffect(() => {
     fetchProducts();
@@ -30,7 +35,7 @@ export default function CatalogoModule() {
 
   const fetchProducts = async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from("products")
       .select("*")
       .order("name");
@@ -42,10 +47,23 @@ export default function CatalogoModule() {
   };
 
   return (
-    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/[0.05] dark:bg-white/[0.03]">
-      <div className="max-w-full overflow-x-auto">
-        <div className="min-w-[800px]">
-          <Table>
+    <div className="space-y-4">
+      {role === "admin" && (
+        <div className="flex justify-end">
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition-colors font-medium text-sm"
+          >
+            <Plus className="w-4 h-4" />
+            Nuevo Producto
+          </button>
+        </div>
+      )}
+
+      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/[0.05] dark:bg-white/[0.03]">
+        <div className="max-w-full overflow-x-auto">
+          <div className="min-w-[800px]">
+            <Table>
             <TableHeader className="border-b border-gray-100 dark:border-white/[0.05]">
               <TableRow>
                 <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">
@@ -117,6 +135,13 @@ export default function CatalogoModule() {
           </Table>
         </div>
       </div>
+    </div>
+
+      <CreateProductModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSuccess={fetchProducts}
+      />
     </div>
   );
 }

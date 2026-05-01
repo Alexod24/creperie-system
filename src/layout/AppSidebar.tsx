@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useSidebar } from "../context/SidebarContext";
 import {
   Search,
-  Home,
+
   BarChart2,
   Settings,
   X,
@@ -15,7 +15,8 @@ import {
   Package,
   BookOpen,
   List,
-  Users
+  Users,
+  Activity
 } from "lucide-react";
 import Image from "next/image";
 
@@ -34,6 +35,7 @@ const navItems: NavItem[] = [
 
 const managementItems: NavItem[] = [
   { name: "Dashboard", icon: <BarChart2 className="w-5 h-5" />, path: "/" },
+  { name: "Movimientos", icon: <Activity className="w-5 h-5" />, path: "/movimientos" },
   { name: "Recetario", icon: <BookOpen className="w-5 h-5" />, path: "/recetario" },
   { name: "Catálogo", icon: <List className="w-5 h-5" />, path: "/catalogo" },
 ];
@@ -169,7 +171,7 @@ const AppSidebar: React.FC = () => {
             </div>
             <div className="flex items-center space-x-3 text-sm">
               <button className="text-gray-500 font-medium hover:text-gray-700">Dismiss</button>
-              <button className="text-purple-600 font-medium hover:text-purple-700">What's new?</button>
+              <button className="text-purple-600 font-medium hover:text-purple-700">What&apos;s new?</button>
             </div>
           </div>
         )}

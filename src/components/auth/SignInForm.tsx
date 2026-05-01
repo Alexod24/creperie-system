@@ -129,7 +129,7 @@ export default function SignInForm() {
                     placeholder="info@gmail.com" 
                     type="email" 
                     value={email}
-                    onChange={(e: any) => setEmail(e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
                   />
                 </div>
                 <div>
@@ -141,7 +141,7 @@ export default function SignInForm() {
                       type={showPassword ? "text" : "password"}
                       placeholder="Enter your password"
                       value={password}
-                      onChange={(e: any) => setPassword(e.target.value)}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
                     />
                     <span
                       onClick={() => setShowPassword(!showPassword)}
