@@ -1,5 +1,5 @@
 "use client";
-import React from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSidebar } from "../context/SidebarContext";
@@ -16,9 +16,12 @@ import {
   BookOpen,
   List,
   Users,
-  Activity
+  Activity,
+  Receipt,
+  LogOut
 } from "lucide-react";
 import Image from "next/image";
+import { useAuth } from "../context/AuthContext";
 
 type NavItem = {
   name: string;
@@ -38,6 +41,7 @@ const managementItems: NavItem[] = [
   { name: "Movimientos", icon: <Activity className="w-5 h-5" />, path: "/movimientos" },
   { name: "Recetario", icon: <BookOpen className="w-5 h-5" />, path: "/recetario" },
   { name: "Catálogo", icon: <List className="w-5 h-5" />, path: "/catalogo" },
+  { name: "Ventas", icon: <Receipt className="w-5 h-5" />, path: "/ventas" },
 ];
 
 const bottomItems: NavItem[] = [
@@ -47,7 +51,9 @@ const bottomItems: NavItem[] = [
 
 const AppSidebar: React.FC = () => {
   const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
+  const { user, signOut } = useAuth();
   const pathname = usePathname();
+  const [showFeatures, setShowFeatures] = useState(true);
 
   const renderNav = (items: NavItem[]) => {
     return (
@@ -143,15 +149,18 @@ const AppSidebar: React.FC = () => {
            <h3 className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 mt-6">Gestión y Control</h3>
         )}
         {renderNav(managementItems)}
+
+        {(isExpanded || isHovered || isMobileOpen) && (
+           <h3 className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 mt-6">Configuración</h3>
+        )}
+        {renderNav(bottomItems)}
       </div>
 
       {/* Bottom Area */}
       <div className="px-3 pb-4 space-y-4">
-        {renderNav(bottomItems)}
-        
-        {(isExpanded || isHovered || isMobileOpen) && (
+        {showFeatures && (isExpanded || isHovered || isMobileOpen) && (
           <div className="bg-gray-50 rounded-lg p-4 relative mt-4">
-            <button className="absolute top-2 right-2 text-gray-400 hover:text-gray-600">
+            <button onClick={() => setShowFeatures(false)} className="absolute top-2 right-2 text-gray-400 hover:text-gray-600">
               <X className="w-4 h-4" />
             </button>
             <h4 className="text-sm font-semibold text-gray-900 mb-1">New features available!</h4>
@@ -170,7 +179,7 @@ const AppSidebar: React.FC = () => {
               </div>
             </div>
             <div className="flex items-center space-x-3 text-sm">
-              <button className="text-gray-500 font-medium hover:text-gray-700">Dismiss</button>
+              <button onClick={() => setShowFeatures(false)} className="text-gray-500 font-medium hover:text-gray-700">Dismiss</button>
               <button className="text-purple-600 font-medium hover:text-purple-700">What&apos;s new?</button>
             </div>
           </div>
@@ -180,22 +189,25 @@ const AppSidebar: React.FC = () => {
         {(isExpanded || isHovered || isMobileOpen) && (
           <div className="pt-4 border-t border-gray-200 mt-2">
             <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-full overflow-hidden relative">
-                  <Image 
-                    src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=60" 
-                    alt="Caitlyn King"
-                    fill
-                    className="object-cover"
-                  />
+              <div className="flex items-center space-x-3 overflow-hidden">
+                <div className="w-10 h-10 rounded-full flex-shrink-0 bg-brand-100 dark:bg-brand-900/50 border border-brand-200 dark:border-brand-800 flex items-center justify-center text-brand-700 dark:text-brand-400 font-bold text-lg shadow-sm">
+                  {(user?.user_metadata?.full_name || user?.email || "U").charAt(0).toUpperCase()}
                 </div>
-                <div className="flex flex-col">
-                  <span className="text-sm font-semibold text-gray-900">Caitlyn King</span>
-                  <span className="text-sm text-gray-500">caitlyn@untitledui.com</span>
+                <div className="flex flex-col overflow-hidden max-w-[130px]">
+                  <span className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                    {user?.user_metadata?.full_name || "Usuario"}
+                  </span>
+                  <span className="text-xs text-gray-500 truncate">
+                    {user?.email || "Sin correo"}
+                  </span>
                 </div>
               </div>
-              <button className="text-gray-400 hover:text-gray-600">
-                <Settings className="w-5 h-5" />
+              <button 
+                onClick={signOut}
+                title="Cerrar sesión"
+                className="text-gray-400 hover:text-red-500 transition-colors flex-shrink-0"
+              >
+                <LogOut className="w-5 h-5" />
               </button>
             </div>
           </div>

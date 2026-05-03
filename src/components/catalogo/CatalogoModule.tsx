@@ -35,15 +35,20 @@ export default function CatalogoModule() {
 
   const fetchProducts = async () => {
     setLoading(true);
-    const { data } = await supabase
-      .from("products")
-      .select("*")
-      .order("name");
-    
-    if (data) {
-      setProducts(data);
+    try {
+      const { data } = await supabase
+        .from("products")
+        .select("*")
+        .order("name");
+      
+      if (data) {
+        setProducts(data);
+      }
+    } catch (err) {
+      console.error("Exception fetching products:", err);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (

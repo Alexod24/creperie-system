@@ -25,16 +25,21 @@ export default function RecetarioGrid() {
 
   const fetchProducts = async () => {
     setLoading(true);
-    const { data } = await supabase
-      .from("products")
-      .select("*")
-      .eq('is_active', true)
-      .order("name");
-    
-    if (data) {
-      setProducts(data);
+    try {
+      const { data } = await supabase
+        .from("products")
+        .select("*")
+        .eq('is_active', true)
+        .order("name");
+      
+      if (data) {
+        setProducts(data);
+      }
+    } catch (err) {
+      console.error("Exception fetching products:", err);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const filteredProducts = products.filter(p => 
