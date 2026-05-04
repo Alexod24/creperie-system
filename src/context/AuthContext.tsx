@@ -44,27 +44,36 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       async (event, session) => {
         if (!isMounted) return;
 
-        console.log("Auth Event:", event);
-        const currentUser = session?.user ?? null;
+        console.log("Evento de Autenticación Detectado:", event);
+        console.log("Sesión de Supabase:", session ? "Activa" : "Nula");
         
+        const currentUser = session?.user ?? null;
         setUser(currentUser);
         
         if (currentUser) {
+          console.log("Usuario autenticado:", currentUser.email);
           try {
-            const { data } = await supabase
+            console.log("Obteniendo rol para usuario:", currentUser.id);
+            const { data, error } = await supabase
               .from('users')
               .select('role')
               .eq('id', currentUser.id)
               .single();
             
+            if (error) {
+              console.error("Error al obtener rol desde tabla 'users':", error.message);
+            }
+
             if (isMounted) {
+              console.log("Rol obtenido:", data?.role || "Ninguno");
               setRole(data?.role || null);
             }
           } catch (err) {
-            console.error("Error fetching role in auth change:", err);
+            console.error("Excepción al buscar rol:", err);
             if (isMounted) setRole(null);
           }
         } else {
+          console.log("No hay usuario autenticado.");
           setRole(null);
         }
         
@@ -128,11 +137,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     if (!loading) {
+      console.log("Evaluando redirección - Usuario:", user ? user.email : "Nulo", "| Pathname:", pathname);
       if (!user && pathname !== "/signin" && pathname !== "/signup") {
+        console.log("Usuario no autenticado en ruta protegida. Redirigiendo a /signin");
         router.push("/signin");
       } else if (user && (pathname === "/signin" || pathname === "/signup")) {
+        console.log("Usuario autenticado en ruta de auth. Redirigiendo a /");
         router.push("/");
       }
+    } else {
+      console.log("AuthContext aún cargando...");
     }
   }, [user, loading, pathname, router]);
 

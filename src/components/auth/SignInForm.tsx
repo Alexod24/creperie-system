@@ -22,17 +22,47 @@ export default function SignInForm() {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    console.log("Intentando iniciar sesión con:", email);
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      console.log("Iniciando petición a Supabase...");
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    if (error) {
-      setError(error.message);
+      if (error) {
+        console.error("Error de Supabase Auth:", {
+          message: error.message,
+          status: error.status,
+          name: error.name
+        });
+        setError(error.message);
+        setLoading(false);
+      } else {
+        console.log("Login exitoso en Supabase:", data);
+        
+        // Verificar sesión inmediatamente
+        const { data: sessionData } = await supabase.auth.getSession();
+        console.log("Sesión actual después del login:", sessionData.session);
+
+        if (!sessionData.session) {
+          console.warn("ADVERTENCIA: Login exitoso pero no se encontró sesión activa.");
+        }
+
+        console.log("Redirigiendo a '/'...");
+        router.push("/");
+        
+        // Asegurar que loading se apague si el push no es instantáneo
+        setTimeout(() => {
+          console.log("Timeout de redirección alcanzado");
+          setLoading(false);
+        }, 3000);
+      }
+    } catch (err: any) {
+      console.error("Error de red o excepción inesperada:", err);
+      setError(err.message || "Ocurrió un error inesperado");
       setLoading(false);
-    } else {
-      router.push("/");
     }
   };
   return (
@@ -170,7 +200,12 @@ export default function SignInForm() {
                   </Link>
                 </div>
                 <div>
-                  <Button className="w-full h-12 text-lg font-black shadow-lg shadow-brand-500/20" size="sm" disabled={loading}>
+                  <Button 
+                    type="submit"
+                    className="w-full h-12 text-lg font-black shadow-lg shadow-brand-500/20" 
+                    size="sm" 
+                    disabled={loading}
+                  >
                     {loading ? "Iniciando sesión..." : "Ingresar al Panel"}
                   </Button>
                 </div>

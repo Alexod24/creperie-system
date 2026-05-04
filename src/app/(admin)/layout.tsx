@@ -13,9 +13,9 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   const { isExpanded, isHovered, isMobileOpen } = useSidebar();
-  const { loading } = useAuth();
+  const { loading, user } = useAuth();
 
-  // Dynamic class for main content margin based on sidebar state
+  console.log("AdminLayout Render - Loading:", loading, "| User:", user ? user.email : "Nulo");
   const mainContentMargin = isMobileOpen
     ? "ml-0"
     : isExpanded || isHovered
