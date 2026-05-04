@@ -28,23 +28,24 @@ export default function CatalogoModule() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const { role } = useAuth();
+  const { role, loading: authLoading, user } = useAuth();
 
   useEffect(() => {
-    const timer = setTimeout(() => {
+    if (!authLoading) {
       fetchProducts();
-    }, 100);
-    return () => clearTimeout(timer);
-  }, []);
+    }
+  }, [authLoading, user]);
  
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabaseQuery(
-        supabase
+      const { data } = await supabaseQuery<any>(
+        () => supabase
           .from("products")
           .select("*")
-          .order("name")
+          .order("name"),
+        2,
+        "fetch-products-catalogo"
       );
       
       if (error) {

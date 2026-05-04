@@ -53,13 +53,13 @@ export default function PosModule() {
       setLoading(true);
       console.log("POS: Fetching products...");
       
-      const { data, error } = await supabaseQuery(
-        supabase
+      const { data } = await supabaseQuery<any>(
+        () => supabase
           .from("products")
           .select("*")
           .eq("is_active", true)
           .order("name"),
-        undefined,
+        2,
         "fetch-products"
       );
       

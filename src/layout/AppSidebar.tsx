@@ -21,7 +21,8 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
-  Wallet
+  Wallet,
+  Trash2
 } from "lucide-react";
 import Image from "next/image";
 import { useAuth } from "../context/AuthContext";
@@ -44,6 +45,7 @@ const navItems: NavItem[] = [
 const managementItems: NavItem[] = [
   { name: "Dashboard", icon: <BarChart2 className="w-5 h-5" />, path: "/" },
   { name: "Movimientos", icon: <Activity className="w-5 h-5" />, path: "/movimientos" },
+  { name: "Mermas", icon: <Trash2 className="w-5 h-5" />, path: "/mermas" },
 ];
 
 const resourceItems: NavItem[] = [

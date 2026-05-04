@@ -47,29 +47,20 @@ export default function SalesList() {
   const fetchSales = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabaseQuery(
-        supabase
+      const { data } = await supabaseQuery<any>(
+        () => supabase
           .from("sales")
           .select(`
             *,
-            users (
-              full_name,
-              email
-            )
+            users ( full_name, email )
           `)
-          .order("created_at", { ascending: false }),
-        undefined,
+          .order("created_at", { ascending: false })
+          .limit(100),
+        2,
         "fetch-sales"
       );
-
-      if (error) {
-        console.error("Error fetching sales:", error);
-      }
-
-      if (data) {
-        setSales(data);
-      }
-    } catch (err) {
+      if (data) setSales(data);
+    } catch (err: any) {
       console.error("Exception fetching sales:", err);
     } finally {
       setLoading(false);
@@ -80,8 +71,8 @@ export default function SalesList() {
   const fetchSaleItems = async (saleId: number) => {
     setLoadingItems(true);
     try {
-      const { data, error } = await supabaseQuery(
-        supabase
+      const { data } = await supabaseQuery<any>(
+        () => supabase
           .from("sale_items")
           .select(`
             *,
@@ -90,13 +81,9 @@ export default function SalesList() {
             )
           `)
           .eq("sale_id", saleId),
-        undefined,
+        2,
         "fetch-sale-items"
       );
-
-      if (error) {
-        console.error("Error fetching sale items:", error);
-      }
 
       if (data) {
         setSaleItems(data);

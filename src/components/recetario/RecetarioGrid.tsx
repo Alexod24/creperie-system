@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { supabaseQuery } from "@/lib/supabaseUtils";
 import Link from "next/link";
+import { useAuth } from "@/context/AuthContext";
 import { BookOpen, ChevronRight, Search } from "lucide-react";
 
 type Product = {
@@ -14,26 +15,28 @@ type Product = {
   stock: number;
   is_active: boolean;
 };
-
 export default function RecetarioGrid() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const { user, loading: authLoading } = useAuth();
 
   useEffect(() => {
-    fetchProducts();
-  }, []);
+    if (!authLoading) {
+      fetchProducts();
+    }
+  }, [authLoading, user]);
 
   const fetchProducts = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabaseQuery(
-        supabase
+      const { data } = await supabaseQuery<any>(
+        () => supabase
           .from("products")
           .select("*")
           .eq('is_active', true)
           .order("name"),
-        undefined,
+        2,
         "fetch-recetario-products"
       );
 

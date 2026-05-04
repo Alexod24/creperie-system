@@ -48,6 +48,15 @@ export default function InventoryModule() {
   const [entryUnit, setEntryUnit] = useState("");
   const [entryCost, setEntryCost] = useState("");
 
+  // Create States
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newUnit, setNewUnit] = useState("g");
+  const [newMinStock, setNewMinStock] = useState("");
+  const [newInitialStock, setNewInitialStock] = useState("");
+  const [newCost, setNewCost] = useState("");
+  const [isCreating, setIsCreating] = useState(false);
+
   useEffect(() => {
     if (!authLoading) {
       fetchIngredients();
@@ -57,12 +66,12 @@ export default function InventoryModule() {
   const fetchIngredients = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabaseQuery(
-        supabase
+      const { data } = await supabaseQuery<any>(
+        () => supabase
           .from("ingredients")
           .select("*")
           .order("name"),
-        undefined,
+        2,
         "fetch-ingredients"
       );
       
@@ -82,6 +91,56 @@ export default function InventoryModule() {
     total: ingredients.length,
     lowStock: ingredients.filter(i => i.current_stock <= i.min_stock && i.current_stock > 0).length,
     outOfStock: ingredients.filter(i => i.current_stock === 0).length,
+  };
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newName || !newUnit) return;
+
+    try {
+      setIsCreating(true);
+      
+      // 1. Crear el insumo
+      const { data, error } = await supabaseQuery<any>(
+        supabase
+          .from("ingredients")
+          .insert({
+            name: newName,
+            unit: newUnit,
+            min_stock: parseFloat(newMinStock) || 0,
+            current_stock: parseFloat(newInitialStock) || 0,
+            cost_per_unit: parseFloat(newCost) || 0
+          })
+          .select(),
+        undefined,
+        "create-ingredient"
+      );
+
+      if (error) throw error;
+
+      // 2. Si tiene stock inicial, registrar movimiento
+      if (data && data[0] && parseFloat(newInitialStock) > 0) {
+        await supabase
+          .from("inventory_movements")
+          .insert({
+            ingredient_id: data[0].id,
+            movement_type: "entrada",
+            quantity: parseFloat(newInitialStock),
+            notes: "Stock inicial al crear insumo"
+          });
+      }
+
+      setIsCreateModalOpen(false);
+      setNewName("");
+      setNewMinStock("");
+      setNewInitialStock("");
+      setNewCost("");
+      fetchIngredients();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   const handleEntry = async (e: React.FormEvent) => {
@@ -163,9 +222,18 @@ export default function InventoryModule() {
       <div className="bg-white dark:bg-gray-800 rounded-[32px] border border-gray-100 dark:border-gray-700 shadow-xl overflow-hidden">
         {/* Header with Search */}
         <div className="p-6 md:p-8 border-b border-gray-100 dark:border-gray-700 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h2 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">Inventario Global</h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Control atómico de materias primas e insumos.</p>
+          <div className="flex flex-col md:flex-row md:items-center gap-4">
+            <div>
+              <h2 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">Inventario Global</h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Control atómico de materias primas e insumos.</p>
+            </div>
+            <button 
+              onClick={() => setIsCreateModalOpen(true)}
+              className="px-6 py-3 bg-brand-600 text-white rounded-2xl text-sm font-black uppercase tracking-widest hover:bg-brand-700 hover:-translate-y-0.5 active:translate-y-0 transition-all shadow-lg shadow-brand-500/20 flex items-center justify-center gap-2"
+            >
+              <Plus className="w-5 h-5" />
+              Nuevo Insumo
+            </button>
           </div>
           
           <div className="relative w-full md:w-80">
@@ -372,6 +440,105 @@ export default function InventoryModule() {
                   className="flex-1 px-6 py-4 bg-brand-600 text-white rounded-2xl font-bold text-sm shadow-xl shadow-brand-500/30 hover:bg-brand-700 hover:-translate-y-0.5 active:translate-y-0 transition-all"
                 >
                   Registrar Entrada
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* Create Modal */}
+      {isCreateModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-gray-800 rounded-[32px] w-full max-w-md shadow-2xl overflow-hidden border border-white/10 animate-in zoom-in-95 duration-300">
+            <div className="p-8 bg-gradient-to-br from-brand-600 to-brand-800 text-white relative">
+              <div className="relative z-10">
+                <h3 className="text-2xl font-black tracking-tight flex items-center gap-3">
+                  <Plus className="w-7 h-7 text-white" />
+                  Nuevo Insumo
+                </h3>
+                <p className="text-brand-100 text-sm mt-2 font-medium">Define las propiedades de la nueva materia prima.</p>
+              </div>
+              <div className="absolute top-0 right-0 p-8 opacity-10">
+                <Layers className="w-24 h-24" />
+              </div>
+            </div>
+            
+            <form onSubmit={handleCreate} className="p-8 space-y-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Nombre del Insumo</label>
+                <input 
+                  type="text" 
+                  className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl px-5 py-4 outline-none focus:ring-2 focus:ring-brand-500 font-bold"
+                  placeholder="Ej. Harina Premium"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Unidad Base</label>
+                  <select 
+                    className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl px-5 py-4 outline-none focus:ring-2 focus:ring-brand-500 font-bold appearance-none cursor-pointer"
+                    value={newUnit}
+                    onChange={(e) => setNewUnit(e.target.value)}
+                  >
+                    <option value="g">Gramos (g)</option>
+                    <option value="ml">Mililitros (ml)</option>
+                    <option value="u">Unidades (u)</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Stock Mínimo</label>
+                  <input 
+                    type="number" 
+                    className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl px-5 py-4 outline-none focus:ring-2 focus:ring-brand-500 font-bold"
+                    placeholder="500"
+                    value={newMinStock}
+                    onChange={(e) => setNewMinStock(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Stock Inicial</label>
+                  <input 
+                    type="number" 
+                    className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl px-5 py-4 outline-none focus:ring-2 focus:ring-brand-500 font-bold"
+                    placeholder="0"
+                    value={newInitialStock}
+                    onChange={(e) => setNewInitialStock(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Costo Unitario</label>
+                  <input 
+                    type="number" 
+                    step="0.0001"
+                    className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl px-5 py-4 outline-none focus:ring-2 focus:ring-brand-500 font-bold"
+                    placeholder="0.00"
+                    value={newCost}
+                    onChange={(e) => setNewCost(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-4 pt-2">
+                <button 
+                  type="button" 
+                  onClick={() => setIsCreateModalOpen(false)}
+                  className="flex-1 px-6 py-4 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-2xl font-bold text-sm hover:bg-gray-200 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit" 
+                  disabled={isCreating}
+                  className="flex-1 px-6 py-4 bg-brand-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl shadow-brand-500/30 hover:bg-brand-700 hover:-translate-y-0.5 active:translate-y-0 transition-all"
+                >
+                  {isCreating ? "Creando..." : "Crear Insumo"}
                 </button>
               </div>
             </form>

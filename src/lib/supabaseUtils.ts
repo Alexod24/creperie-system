@@ -3,14 +3,14 @@ import { supabase } from "./supabaseClient";
 /**
  * Realiza una consulta a Supabase con un tiempo límite (timeout) para evitar bloqueos infinitos de la UI.
  * @param query La promesa o query de Supabase
- * @param timeoutMs Tiempo máximo de espera en milisegundos (default 30000)
+ * @param timeoutMs Tiempo máximo de espera en milisegundos (default 120000)
  * @param label Etiqueta para identificar la consulta en logs (opcional)
  */
 export async function supabaseQuery<T>(
-  query: any, 
-  timeoutMs: number = 45000,
+  queryOrFactory: any, 
+  retries: number = 2, 
   label: string = "unnamed-query",
-  retries: number = 2
+  timeoutMs: number = 120000
 ): Promise<T> {
   let lastError: any;
 
@@ -19,9 +19,11 @@ export async function supabaseQuery<T>(
     
     try {
       if (attempt > 0) {
-        console.log(`Retrying query [${label}] - Attempt ${attempt}/${retries}`);
-        // Pequeña espera antes de reintentar (exponential backoff simple)
-        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+        // Cálculo de espera con backoff exponencial y jitter (aleatoriedad)
+        // Intento 1: ~1-2s, Intento 2: ~4-5s
+        const delay = Math.min(1000 * Math.pow(2, attempt) + Math.random() * 1000, 10000);
+        console.warn(`Reintento ${attempt}/${retries} para [${label}] en ${Math.round(delay)}ms...`);
+        await new Promise(res => setTimeout(res, delay));
       }
 
       const timeoutPromise = new Promise((_, reject) => {
@@ -31,15 +33,18 @@ export async function supabaseQuery<T>(
         }, timeoutMs);
       });
 
-      // Ejecutamos la consulta. Usamos Promise.race para el timeout.
+      // Si es una función (factory), obtenemos una instancia nueva para cada reintento.
+      // Esto es CRUCIAL porque una promesa fallida de Supabase no se puede "reiniciar".
+      const queryToExec = typeof queryOrFactory === 'function' ? queryOrFactory() : queryOrFactory;
+      
       const result = await Promise.race([
-        Promise.resolve(query), 
+        Promise.resolve(queryToExec), 
         timeoutPromise
       ]) as any;
       
       if (timeoutId) clearTimeout(timeoutId);
 
-      // Si Supabase devuelve un error en el objeto de respuesta, lo lanzamos para que el catch lo maneje
+      // Si Supabase devuelve un error en el objeto de respuesta, lo lanzamos para reintentar
       if (result && result.error) {
         throw result.error;
       }
@@ -50,15 +55,14 @@ export async function supabaseQuery<T>(
       if (timeoutId) clearTimeout(timeoutId);
       lastError = error;
 
-      const isTimeout = error.message?.includes("Timeout");
-      const isNetworkError = error.message?.includes("fetch") || error.message?.includes("Network");
-
-      if (attempt < retries && (isTimeout || isNetworkError)) {
-        console.warn(`Supabase Query failed [${label}], retrying...`, error.message);
+      // Solo reintentamos si no es el último intento
+      if (attempt < retries) {
+        // Log detallado para diagnóstico
+        console.warn(`Fallo en [${label}] (Intento ${attempt + 1}):`, error.message || error);
         continue;
       }
       
-      console.error(`Supabase Query Error final [${label}]:`, error);
+      console.error(`Error definitivo en [${label}] tras ${retries + 1} intentos:`, error);
       throw error;
     }
   }
