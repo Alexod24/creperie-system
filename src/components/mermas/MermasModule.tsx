@@ -10,12 +10,9 @@ import {
   Trash2, 
   AlertOctagon, 
   Search, 
-  Calendar, 
   Package, 
-  ArrowDownRight,
   Plus,
-  History,
-  Info
+  History
 } from "lucide-react";
 import Button from "@/components/ui/button/Button";
 

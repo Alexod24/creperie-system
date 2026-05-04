@@ -4,7 +4,17 @@ import React, { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { supabaseQuery } from "@/lib/supabaseUtils";
 import { useAuth } from "@/context/AuthContext";
-import { Search, Calendar, User, CreditCard, ChevronRight, Download, Filter, TrendingUp, ShoppingBag, DollarSign, X, RefreshCw } from "lucide-react";
+import { 
+  Search, 
+  Calendar, 
+  TrendingUp, 
+  ShoppingBag, 
+  DollarSign,
+  ChevronRight,
+  Clock,
+  History,
+  Receipt
+} from "lucide-react";
 
 type SaleItem = {
   id: number;
