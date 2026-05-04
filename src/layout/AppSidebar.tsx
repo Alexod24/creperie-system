@@ -20,7 +20,8 @@ import {
   Receipt,
   LogOut,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Wallet
 } from "lucide-react";
 import Image from "next/image";
 import { useAuth } from "../context/AuthContext";
@@ -42,6 +43,7 @@ const managementItems: NavItem[] = [
   { name: "Dashboard", icon: <BarChart2 className="w-5 h-5" />, path: "/" },
   { name: "Movimientos", icon: <Activity className="w-5 h-5" />, path: "/movimientos" },
   { name: "Recetario", icon: <BookOpen className="w-5 h-5" />, path: "/recetario" },
+  { name: "Caja", icon: <Wallet className="w-5 h-5" />, path: "/caja" },
   { name: "Catálogo", icon: <List className="w-5 h-5" />, path: "/catalogo" },
   { name: "Ventas", icon: <Receipt className="w-5 h-5" />, path: "/ventas" },
 ];

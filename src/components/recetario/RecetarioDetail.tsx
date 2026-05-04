@@ -4,6 +4,8 @@ import React, { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { supabaseQuery } from "@/lib/supabaseUtils";
 import { useParams } from "next/navigation";
+import { useToast } from "@/context/ToastContext";
+import { useConfirm } from "@/context/ConfirmContext";
 import { 
   ChevronLeft, 
   Trash2, 
@@ -41,6 +43,8 @@ type RecipeItem = {
 export default function RecetarioDetail() {
   const { id } = useParams();
   const { role } = useAuth();
+  const { showToast } = useToast();
+  const { confirm } = useConfirm();
   
   const [product, setProduct] = useState<Product | null>(null);
   const [recipe, setRecipe] = useState<RecipeItem[]>([]);
@@ -143,13 +147,18 @@ export default function RecetarioDetail() {
       setNewIngredientId("");
       setNewQuantity("");
     } catch (err) {
-      alert("Error al añadir ingrediente. Tal vez ya existe en la receta.");
+      showToast("Error", "Error al añadir ingrediente. Tal vez ya existe en la receta.", "error");
       console.error(err);
     }
   };
 
   const handleRemoveIngredient = async (recipeId: number) => {
-    if (!confirm("¿Seguro que quieres quitar este insumo de la receta?")) return;
+    const isConfirmed = await confirm({
+      title: "¿Quitar Insumo?",
+      message: "¿Seguro que quieres quitar este insumo de la receta?",
+      type: "danger"
+    });
+    if (!isConfirmed) return;
 
     try {
       const { error } = await supabase

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { supabaseQuery } from "@/lib/supabaseUtils";
 import { useAuth } from "@/context/AuthContext";
+import { useToast } from "@/context/ToastContext";
 import Button from "@/components/ui/button/Button";
 import { Trash2 } from "lucide-react";
 
@@ -21,6 +22,7 @@ type PrepItem = Product & {
 
 export default function PreparacionModule() {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [products, setProducts] = useState<Product[]>([]);
   const [prepList, setPrepList] = useState<PrepItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -161,13 +163,13 @@ export default function PreparacionModule() {
         }
       }
 
-      alert("Preparación registrada exitosamente. Se ha sumado el stock y descontado insumos.");
+      showToast("Preparación Exitosa", "Se ha sumado el stock y descontado insumos.", "success");
       setPrepList([]); // Limpiar lista
       fetchProducts(); // Refrescar stock visual de productos
     } catch (error) {
       console.error("Error general:", error);
       const message = error instanceof Error ? error.message : "Hubo un error al procesar la preparación.";
-      alert(message);
+      showToast("Error", message, "error");
     } finally {
       setIsProcessing(false);
     }

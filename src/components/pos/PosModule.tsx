@@ -4,8 +4,10 @@ import React, { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { supabaseQuery } from "@/lib/supabaseUtils";
 import { useAuth } from "@/context/AuthContext";
+import { useCash } from "@/context/CashContext";
+import { useToast } from "@/context/ToastContext";
 import Button from "@/components/ui/button/Button";
-
+import CashSessionModal from "./CashSessionModal";
 
 type Product = {
   id: number;
@@ -23,6 +25,8 @@ type CartItem = Product & {
 
 export default function PosModule() {
   const { user } = useAuth();
+  const { activeSession } = useCash();
+  const { showToast } = useToast();
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -109,7 +113,7 @@ export default function PosModule() {
   const total = cart.reduce((sum, item) => sum + item.subtotal, 0);
 
   const processSale = async () => {
-    if (cart.length === 0 || !user) return;
+    if (cart.length === 0 || !user || !activeSession) return;
     setIsProcessing(true);
 
     try {
@@ -120,6 +124,7 @@ export default function PosModule() {
           .insert({
             user_id: user.id,
             total: total,
+            session_id: activeSession.id
           })
           .select()
           .single(),
@@ -160,12 +165,12 @@ export default function PosModule() {
         );
       }
 
-      alert("Venta registrada exitosamente");
+      showToast("Éxito", "Venta registrada exitosamente", "success");
       setCart([]); // Limpiar carrito
       fetchProducts(); // Refrescar stock
     } catch (error) {
       console.error("Error al procesar la venta:", error);
-      alert("Hubo un error al procesar la venta.");
+      showToast("Error", "Hubo un error al procesar la venta.", "error");
     } finally {
       setIsProcessing(false);
     }
@@ -295,6 +300,9 @@ export default function PosModule() {
           </Button>
         </div>
       </div>
+      
+      {/* Modal de Apertura de Caja */}
+      <CashSessionModal />
     </div>
   );
 }
