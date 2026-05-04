@@ -40,7 +40,6 @@ export default function RecetarioGrid() {
         "fetch-recetario-products"
       );
 
-      if (error) throw error;
       
       if (data) {
         setProducts(data);
