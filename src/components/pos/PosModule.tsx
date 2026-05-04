@@ -53,7 +53,7 @@ export default function PosModule() {
       setLoading(true);
       console.log("POS: Fetching products...");
       
-      const { data } = await supabaseQuery<any>(
+      const { data, error } = await supabaseQuery<any>(
         () => supabase
           .from("products")
           .select("*")

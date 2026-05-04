@@ -13,7 +13,11 @@ import {
   ChevronRight,
   Clock,
   History,
-  Receipt
+  Receipt,
+  CreditCard,
+  X,
+  Download,
+  RefreshCw
 } from "lucide-react";
 
 type SaleItem = {
@@ -57,7 +61,7 @@ export default function SalesList() {
   const fetchSales = async () => {
     try {
       setLoading(true);
-      const { data } = await supabaseQuery<any>(
+      const { data, error } = await supabaseQuery<any>(
         () => supabase
           .from("sales")
           .select(`
@@ -69,6 +73,7 @@ export default function SalesList() {
         2,
         "fetch-sales"
       );
+      if (error) console.error("Error fetching sales:", error);
       if (data) setSales(data);
     } catch (err: any) {
       console.error("Exception fetching sales:", err);
@@ -81,7 +86,7 @@ export default function SalesList() {
   const fetchSaleItems = async (saleId: number) => {
     setLoadingItems(true);
     try {
-      const { data } = await supabaseQuery<any>(
+      const { data, error } = await supabaseQuery<any>(
         () => supabase
           .from("sale_items")
           .select(`
@@ -94,6 +99,8 @@ export default function SalesList() {
         2,
         "fetch-sale-items"
       );
+
+      if (error) console.error("Error fetching sale items:", error);
 
       if (data) {
         setSaleItems(data);
@@ -193,14 +200,24 @@ export default function SalesList() {
                 className="w-full pl-11 pr-4 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-brand-500 font-medium"
               />
             </div>
-            <div className="relative">
-              <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <div className="relative group">
+              <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-hover:text-brand-500 transition-colors pointer-events-none" />
               <input 
                 type="date" 
                 value={dateFilter}
                 onChange={(e) => setDateFilter(e.target.value)}
-                className="pl-11 pr-4 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-brand-500 font-medium"
+                onClick={(e) => (e.target as any).showPicker?.()}
+                className="pl-11 pr-10 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-brand-500 font-bold text-gray-700 dark:text-gray-200 cursor-pointer hover:border-brand-300 transition-all appearance-none"
               />
+              {dateFilter && (
+                <button 
+                  onClick={() => setDateFilter("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 text-gray-400 hover:text-red-500 transition-colors"
+                  title="Limpiar fecha"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
             </div>
           </div>
 

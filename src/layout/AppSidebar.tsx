@@ -55,13 +55,13 @@ const resourceItems: NavItem[] = [
 ];
 
 const bottomItems: NavItem[] = [
-  { name: "Usuarios", icon: <Users className="w-5 h-5" />, path: "/usuarios" },
+  { name: "Usuarios", icon: <Users className="w-5 h-5" />, path: "/usuarios", adminOnly: true },
   { name: "Ajustes", icon: <Settings className="w-5 h-5" />, path: "/ajustes" },
 ];
 
 const AppSidebar: React.FC = () => {
   const { isExpanded, isMobileOpen, isHovered, setIsHovered, toggleSidebar } = useSidebar();
-  const { user, signOut } = useAuth();
+  const { user, role, signOut } = useAuth();
   const { confirm } = useConfirm();
   const pathname = usePathname();
 
@@ -80,9 +80,15 @@ const AppSidebar: React.FC = () => {
   };
 
   const renderNav = (items: NavItem[]) => {
+    // Filtrar items según el rol
+    const filteredItems = items.filter(item => {
+      if ((item as any).adminOnly && role !== 'admin') return false;
+      return true;
+    });
+
     return (
       <ul className="flex flex-col space-y-1">
-        {items.map((item) => {
+        {filteredItems.map((item) => {
           const isActive = pathname === item.path;
           return (
             <li key={item.name}>

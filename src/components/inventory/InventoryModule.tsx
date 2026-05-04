@@ -41,7 +41,7 @@ export default function InventoryModule() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedIng, setSelectedIng] = useState<Ingredient | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const { user, loading: authLoading } = useAuth();
+  const { user, role, loading: authLoading } = useAuth();
   
   // Entry States
   const [entryQty, setEntryQty] = useState("");
@@ -227,13 +227,15 @@ export default function InventoryModule() {
               <h2 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">Inventario Global</h2>
               <p className="text-sm text-gray-500 dark:text-gray-400">Control atómico de materias primas e insumos.</p>
             </div>
-            <button 
-              onClick={() => setIsCreateModalOpen(true)}
-              className="px-6 py-3 bg-brand-600 text-white rounded-2xl text-sm font-black uppercase tracking-widest hover:bg-brand-700 hover:-translate-y-0.5 active:translate-y-0 transition-all shadow-lg shadow-brand-500/20 flex items-center justify-center gap-2"
-            >
-              <Plus className="w-5 h-5" />
-              Nuevo Insumo
-            </button>
+            {role === 'admin' && (
+              <button 
+                onClick={() => setIsCreateModalOpen(true)}
+                className="px-6 py-3 bg-brand-600 text-white rounded-2xl text-sm font-black uppercase tracking-widest hover:bg-brand-700 hover:-translate-y-0.5 active:translate-y-0 transition-all shadow-lg shadow-brand-500/20 flex items-center justify-center gap-2"
+              >
+                <Plus className="w-5 h-5" />
+                Nuevo Insumo
+              </button>
+            )}
           </div>
           
           <div className="relative w-full md:w-80">
@@ -333,17 +335,19 @@ export default function InventoryModule() {
                     </td>
 
                     <td className="px-8 py-5 text-right">
-                      <button 
-                        onClick={() => {
-                          setSelectedIng(item);
-                          setEntryUnit(item.unit === "g" ? "kg" : item.unit === "ml" ? "litros" : "u");
-                          setIsModalOpen(true);
-                        }}
-                        className="inline-flex items-center gap-2 px-4 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl text-xs font-bold hover:scale-105 active:scale-95 transition-all shadow-lg shadow-gray-900/10 dark:shadow-none"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        Comprar
-                      </button>
+                      {role === 'admin' && (
+                        <button 
+                          onClick={() => {
+                            setSelectedIng(item);
+                            setEntryUnit(item.unit === "g" ? "kg" : item.unit === "ml" ? "litros" : "u");
+                            setIsModalOpen(true);
+                          }}
+                          className="inline-flex items-center gap-2 px-4 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl text-xs font-bold hover:scale-105 active:scale-95 transition-all shadow-lg shadow-gray-900/10 dark:shadow-none"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          Comprar
+                        </button>
+                      )}
                     </td>
                   </tr>
                 );

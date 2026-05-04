@@ -115,13 +115,18 @@ export default function MovimientosModule() {
 
       if (shouldGroup) {
         if (!groups[groupKey]) {
+          // Intentar extraer nombre del producto de las notas si no hay product_id
+          let fallbackName = mov.notes?.includes("Insumo para ") 
+            ? mov.notes.replace("Insumo para ", "") 
+            : (mov.notes?.includes("Preparación de ") ? mov.notes.replace("Preparación de ", "") : "Preparación");
+
           groups[groupKey] = {
             batch_id: mov.batch_id || groupKey,
             timestamp: mov.created_at,
             type: mov.movement_type,
             user: mov.users,
             notes: mov.notes,
-            mainItem: mov.products?.name || (mov.movement_type === 'preparacion' ? "Preparación Grupal" : (mov.ingredients?.name || "Movimiento")),
+            mainItem: mov.products?.name || fallbackName,
             mainQuantity: mov.quantity,
             unit: mov.ingredients?.unit || "u",
             items: [],
@@ -136,7 +141,8 @@ export default function MovimientosModule() {
           groups[groupKey].mainItem = mov.products.name;
           groups[groupKey].mainQuantity = mov.quantity;
           groups[groupKey].unit = "u";
-          if (mov.movement_type === 'entrada') groups[groupKey].type = "entrada";
+          // Forzamos el tipo a entrada para el grupo si hay un producto involucrado
+          groups[groupKey].type = "entrada"; 
         }
       } else {
         // Movimientos individuales (entradas/salidas manuales)
@@ -328,17 +334,21 @@ export default function MovimientosModule() {
                 let displayType = group.type;
                 let displayQuantity = group.mainQuantity;
                 let displaySign = "";
+                let displayText = "";
                 
                 if (isBatch) {
                   if (activeTab === "insumos") {
                     displayType = "preparacion";
-                    displaySign = ""; // Preparación is an action, not just a direction
+                    displaySign = ""; 
+                    displayText = group.mainItem;
                   } else {
                     displayType = "entrada";
                     displaySign = "+";
+                    displayText = group.mainItem;
                   }
                 } else {
                   displaySign = group.type === 'entrada' ? "+" : "-";
+                  displayText = group.mainItem;
                 }
 
                 const isEntry = displayType === 'entrada';
@@ -373,7 +383,7 @@ export default function MovimientosModule() {
                           </div>
                           <div>
                             <span className={`text-sm font-bold block ${isBatch ? 'text-brand-700 dark:text-brand-400' : 'text-gray-900 dark:text-white group-hover:text-brand-600'}`}>
-                              {group.mainItem}
+                              {displayText}
                             </span>
                             {isBatch && (
                               <span className="text-[9px] text-brand-500/70 font-black uppercase tracking-widest">

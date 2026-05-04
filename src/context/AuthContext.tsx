@@ -37,9 +37,37 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     let isMounted = true;
+    
+    // 1. Verificar sesión inicial inmediatamente
+    const checkInitialSession = async () => {
+      try {
+        console.log("Verificando sesión inicial de forma proactiva...");
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) throw error;
+        
+        if (session && isMounted) {
+          console.log("Sesión inicial encontrada:", session.user.email);
+          setUser(session.user);
+          // Intentar cargar el rol de inmediato
+          const { data: roleData } = await supabase
+            .from('users')
+            .select('role')
+            .eq('id', session.user.id)
+            .single();
+          if (isMounted) setRole(roleData?.role || null);
+        } else {
+          console.log("No se encontró sesión inicial activa.");
+        }
+      } catch (err) {
+        console.error("Error en verificación inicial de sesión:", err);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
 
-    // Escuchar cambios de autenticación
-    // onAuthStateChange se dispara inmediatamente con el estado actual al suscribirse
+    checkInitialSession();
+
+    // 2. Escuchar cambios de autenticación proactivamente
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!isMounted) return;
@@ -83,13 +111,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     );
 
-    // Timeout de seguridad: Si después de 5 segundos sigue cargando, liberamos el gate
+    // Timeout de seguridad: Si después de 3 segundos sigue cargando, liberamos el gate
     const safetyTimer = setTimeout(() => {
       if (isMounted && loading) {
-        console.warn("Auth check timed out, forcing loading to false");
+        console.warn("ADVERTENCIA: La verificación de sesión tardó demasiado. Forzando entrada...");
         setLoading(false);
       }
-    }, 5000);
+    }, 3000);
 
     // Heartbeat & Refresh: Cada 4 minutos verificamos la sesión para mantener el token fresco
     const heartbeat = setInterval(async () => {

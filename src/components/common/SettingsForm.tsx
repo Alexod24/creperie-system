@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { useAuth } from "@/context/AuthContext";
 
 type Settings = {
   id: number;
@@ -14,6 +15,9 @@ export default function SettingsForm() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState({ text: "", type: "" });
+  const { role } = useAuth();
+  
+  const isAdmin = role === 'admin';
 
   useEffect(() => {
     fetchSettings();
@@ -92,7 +96,8 @@ export default function SettingsForm() {
                 name="business_name"
                 value={settings.business_name || ""}
                 onChange={handleChange}
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white/50 dark:bg-gray-800/50 focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all outline-none text-gray-900 dark:text-white backdrop-blur-sm"
+                disabled={!isAdmin}
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white/50 dark:bg-gray-800/50 focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all outline-none text-gray-900 dark:text-white backdrop-blur-sm disabled:opacity-60"
                 placeholder="Ej. Mi Crepería S.A.C."
                 required
               />
@@ -107,7 +112,8 @@ export default function SettingsForm() {
                 name="currency"
                 value={settings.currency || "PEN"}
                 onChange={handleChange}
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white/50 dark:bg-gray-800/50 focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all outline-none text-gray-900 dark:text-white backdrop-blur-sm"
+                disabled={!isAdmin}
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white/50 dark:bg-gray-800/50 focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all outline-none text-gray-900 dark:text-white backdrop-blur-sm disabled:opacity-60"
               >
                 <option value="PEN">Soles (S/)</option>
                 <option value="USD">Dólares ($)</option>
@@ -133,24 +139,26 @@ export default function SettingsForm() {
             </div>
           )}
 
-          <div className="pt-6 border-t border-gray-100 dark:border-gray-800">
-            <button
-              type="submit"
-              disabled={saving}
-              className="px-6 py-3 bg-gradient-to-r from-brand-600 to-purple-600 hover:from-brand-500 hover:to-purple-500 text-white rounded-xl font-bold shadow-lg shadow-brand-500/30 transform transition-all hover:-translate-y-0.5 focus:ring-4 focus:ring-brand-500/50 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center gap-2"
-            >
-              {saving ? (
-                <>
-                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                  Guardando...
-                </>
-              ) : (
-                <>
-                  Guardar Cambios
-                </>
-              )}
-            </button>
-          </div>
+          {isAdmin && (
+            <div className="pt-6 border-t border-gray-100 dark:border-gray-800">
+              <button
+                type="submit"
+                disabled={saving}
+                className="px-6 py-3 bg-gradient-to-r from-brand-600 to-purple-600 hover:from-brand-500 hover:to-purple-500 text-white rounded-xl font-bold shadow-lg shadow-brand-500/30 transform transition-all hover:-translate-y-0.5 focus:ring-4 focus:ring-brand-500/50 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center gap-2"
+              >
+                {saving ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                    Guardando...
+                  </>
+                ) : (
+                  <>
+                    Guardar Cambios
+                  </>
+                )}
+              </button>
+            </div>
+          )}
         </form>
       </div>
     </div>

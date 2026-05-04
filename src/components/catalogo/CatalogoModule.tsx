@@ -39,7 +39,7 @@ export default function CatalogoModule() {
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      const { data } = await supabaseQuery<any>(
+      const { data, error } = await supabaseQuery<any>(
         () => supabase
           .from("products")
           .select("*")
