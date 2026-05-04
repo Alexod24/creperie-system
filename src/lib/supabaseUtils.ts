@@ -8,32 +8,60 @@ import { supabase } from "./supabaseClient";
  */
 export async function supabaseQuery<T>(
   query: any, 
-  timeoutMs: number = 120000,
-  label: string = "unnamed-query"
+  timeoutMs: number = 45000,
+  label: string = "unnamed-query",
+  retries: number = 2
 ): Promise<T> {
-  let timeoutId: any;
-  
-  const timeoutPromise = new Promise((_, reject) => {
-    timeoutId = setTimeout(() => {
-      const error = new Error(`Timeout de conexión con Supabase [${label}] tras ${timeoutMs / 1000}s`);
-      console.warn("Supabase Timeout Triggered:", { label, timeoutMs });
-      reject(error);
-    }, timeoutMs);
-  });
+  let lastError: any;
 
-  try {
-    // Convertimos explícitamente a Promesa por si es un thenable de Supabase
-    const result = await Promise.race([
-      Promise.resolve(query), 
-      timeoutPromise
-    ]) as T;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    let timeoutId: any;
     
-    if (timeoutId) clearTimeout(timeoutId);
-    return result;
-  } catch (error) {
-    if (timeoutId) clearTimeout(timeoutId);
-    console.error(`Supabase Query Error [${label}]:`, error);
-    throw error;
-  }
-}
+    try {
+      if (attempt > 0) {
+        console.log(`Retrying query [${label}] - Attempt ${attempt}/${retries}`);
+        // Pequeña espera antes de reintentar (exponential backoff simple)
+        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+      }
 
+      const timeoutPromise = new Promise((_, reject) => {
+        timeoutId = setTimeout(() => {
+          const error = new Error(`Timeout de conexión con Supabase [${label}] tras ${timeoutMs / 1000}s`);
+          reject(error);
+        }, timeoutMs);
+      });
+
+      // Ejecutamos la consulta. Usamos Promise.race para el timeout.
+      const result = await Promise.race([
+        Promise.resolve(query), 
+        timeoutPromise
+      ]) as any;
+      
+      if (timeoutId) clearTimeout(timeoutId);
+
+      // Si Supabase devuelve un error en el objeto de respuesta, lo lanzamos para que el catch lo maneje
+      if (result && result.error) {
+        throw result.error;
+      }
+
+      return result as T;
+
+    } catch (error: any) {
+      if (timeoutId) clearTimeout(timeoutId);
+      lastError = error;
+
+      const isTimeout = error.message?.includes("Timeout");
+      const isNetworkError = error.message?.includes("fetch") || error.message?.includes("Network");
+
+      if (attempt < retries && (isTimeout || isNetworkError)) {
+        console.warn(`Supabase Query failed [${label}], retrying...`, error.message);
+        continue;
+      }
+      
+      console.error(`Supabase Query Error final [${label}]:`, error);
+      throw error;
+    }
+  }
+  
+  throw lastError;
+}

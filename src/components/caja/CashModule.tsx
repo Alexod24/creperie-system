@@ -12,9 +12,14 @@ import {
   TrendingUp, 
   AlertCircle, 
   CheckCircle2,
-  ArrowRight
+  ArrowRight,
+  Search,
+  Calendar,
+  ChevronRight,
+  Filter
 } from "lucide-react";
 import Button from "@/components/ui/button/Button";
+import { supabaseQuery } from "@/lib/supabaseUtils";
 
 export default function CashModule() {
   const { activeSession, closeSession, loading: sessionLoading } = useCash();
@@ -26,6 +31,9 @@ export default function CashModule() {
   const [isClosing, setIsClosing] = useState(false);
   const [sessionTotals, setSessionTotals] = useState({ total: 0, count: 0 });
   const [history, setHistory] = useState<any[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [dateFilter, setDateFilter] = useState("");
 
   useEffect(() => {
     if (activeSession) {
@@ -36,28 +44,54 @@ export default function CashModule() {
 
   const fetchSessionTotals = async () => {
     if (!activeSession) return;
-    const { data, error } = await supabase.rpc('get_session_totals', {
-      p_session_id: activeSession.id
-    });
-    if (data && data[0]) {
-      setSessionTotals({
-        total: Number(data[0].sales_total),
-        count: Number(data[0].sales_count)
-      });
+    try {
+      const { data } = await supabaseQuery<any>(
+        supabase.rpc('get_session_totals', {
+          p_session_id: activeSession.id
+        }),
+        undefined,
+        "fetch-session-totals"
+      );
+      if (data && data[0]) {
+        setSessionTotals({
+          total: Number(data[0].sales_total),
+          count: Number(data[0].sales_count)
+        });
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+  
+  const fetchHistory = async () => {
+    try {
+      setLoadingHistory(true);
+      const { data } = await supabaseQuery<any>(
+        supabase
+          .from("cash_sessions")
+          .select(`
+            *,
+            users ( full_name, email )
+          `)
+          .eq("status", "closed")
+          .order("closed_at", { ascending: false })
+          .limit(50),
+        undefined,
+        "fetch-cash-history"
+      );
+      if (data) setHistory(data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingHistory(false);
     }
   };
 
-  const fetchHistory = async () => {
-    const { data } = await supabase
-      .from("cash_sessions")
-      .select(`
-        *,
-        users ( full_name, email )
-      `)
-      .order("created_at", { ascending: false })
-      .limit(10);
-    if (data) setHistory(data);
-  };
+  const filteredHistory = history.filter(session => {
+    const matchesUser = (session.users?.full_name || session.users?.email || "").toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesDate = !dateFilter || session.closed_at.startsWith(dateFilter);
+    return matchesUser && matchesDate;
+  });
 
   const handleClose = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -96,61 +130,78 @@ export default function CashModule() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 gap-8">
         {/* Panel de Control de Sesión */}
-        <div className="lg:col-span-2 space-y-6">
+        <div>
           {activeSession ? (
             <div className="bg-white dark:bg-gray-800 rounded-[32px] border border-gray-100 dark:border-gray-700 shadow-xl overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div className="p-8 bg-gradient-to-br from-gray-900 to-gray-800 text-white flex justify-between items-start">
+              <div className="p-8 bg-gradient-to-br from-gray-900 to-gray-800 text-white flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
                   <div className="inline-flex items-center gap-2 px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-[10px] font-black uppercase tracking-wider mb-4 border border-green-500/30">
                     <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
                     Sesión Activa
                   </div>
-                  <h2 className="text-2xl font-black">Resumen de Turno</h2>
+                  <h2 className="text-3xl font-black">Turno en Curso</h2>
                   <p className="text-gray-400 text-sm mt-1">
-                    Iniciado por <span className="text-white font-bold">{user?.user_metadata?.full_name || user?.email}</span>
+                    Operado por <span className="text-brand-400 font-bold">{user?.user_metadata?.full_name || user?.email}</span>
                   </p>
                 </div>
-                <div className="text-right">
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Apertura</p>
-                  <p className="text-lg font-bold">{new Date(activeSession.opened_at).toLocaleTimeString()}</p>
+                <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10 text-right">
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Inicio de Turno</p>
+                  <p className="text-xl font-bold">{new Date(activeSession.opened_at).toLocaleTimeString("es-PE", { hour: '2-digit', minute: '2-digit', hour12: true })}</p>
                 </div>
               </div>
 
-              <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="space-y-6">
-                  <div className="grid grid-cols-1 gap-4">
-                    <div className="p-5 bg-gray-50 dark:bg-gray-900/50 rounded-2xl border border-gray-100 dark:border-gray-700">
-                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-2">Monto Inicial</p>
-                      <p className="text-2xl font-black text-gray-900 dark:text-white">S/ {activeSession.initial_amount.toFixed(2)}</p>
+              <div className="p-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <div className="p-6 bg-gray-50 dark:bg-gray-900/50 rounded-[24px] border border-gray-100 dark:border-gray-700 group hover:border-brand-500/30 transition-colors">
+                    <div className="w-10 h-10 bg-gray-100 dark:bg-gray-800 rounded-xl flex items-center justify-center mb-4">
+                      <Wallet className="w-5 h-5 text-gray-400" />
                     </div>
-                    <div className="p-5 bg-brand-50 dark:bg-brand-500/5 rounded-2xl border border-brand-100 dark:border-brand-500/20">
-                      <p className="text-[10px] font-black text-brand-600 dark:text-brand-400 uppercase tracking-wider mb-2">Ventas Netas ({sessionTotals.count})</p>
-                      <p className="text-2xl font-black text-brand-700 dark:text-brand-400">S/ {sessionTotals.total.toFixed(2)}</p>
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1">Monto Inicial (Fondo)</p>
+                    <p className="text-2xl font-black text-gray-900 dark:text-white">S/ {activeSession.initial_amount.toFixed(2)}</p>
+                  </div>
+                  
+                  <div className="p-6 bg-gray-50 dark:bg-gray-900/50 rounded-[24px] border border-gray-100 dark:border-gray-700 group hover:border-emerald-500/30 transition-colors">
+                    <div className="w-10 h-10 bg-emerald-50 dark:bg-emerald-500/10 rounded-xl flex items-center justify-center mb-4">
+                      <TrendingUp className="w-5 h-5 text-emerald-600" />
                     </div>
-                    <div className="p-6 bg-gradient-to-br from-gray-900 to-black rounded-2xl text-white shadow-lg">
-                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-2">Total Esperado en Caja</p>
-                      <p className="text-3xl font-black text-white">S/ {(activeSession.initial_amount + sessionTotals.total).toFixed(2)}</p>
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1">Ventas del Turno ({sessionTotals.count})</p>
+                    <p className="text-2xl font-black text-emerald-600">S/ {sessionTotals.total.toFixed(2)}</p>
+                  </div>
+
+                  <div className="sm:col-span-2 p-8 bg-gradient-to-br from-brand-600 to-brand-800 rounded-[28px] text-white shadow-2xl shadow-brand-500/20 relative overflow-hidden">
+                    <div className="relative z-10">
+                      <p className="text-[10px] font-black text-brand-200 uppercase tracking-widest mb-2">Total Estimado en Caja</p>
+                      <h4 className="text-5xl font-black tracking-tighter">S/ {(activeSession.initial_amount + sessionTotals.total).toFixed(2)}</h4>
+                      <p className="text-xs text-brand-200/80 mt-4 max-w-xs leading-relaxed">
+                        Este monto es la suma del fondo inicial más todas las ventas registradas hasta este momento.
+                      </p>
+                    </div>
+                    <div className="absolute top-0 right-0 p-8 opacity-10">
+                      <Wallet className="w-40 h-40 rotate-12" />
                     </div>
                   </div>
                 </div>
 
-                <div className="flex flex-col justify-center bg-gray-50/50 dark:bg-gray-900/30 rounded-[24px] p-8 border border-dashed border-gray-200 dark:border-gray-700">
-                  <h3 className="text-lg font-black text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                    <Lock className="w-5 h-5 text-brand-600" />
-                    Cerrar Caja
-                  </h3>
-                  <form onSubmit={handleClose} className="space-y-4">
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-gray-500 uppercase">Efectivo Real en Caja</label>
-                      <div className="relative">
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">S/</span>
+                <div className="flex flex-col bg-gray-50 dark:bg-gray-900/40 rounded-[32px] p-8 border border-gray-100 dark:border-gray-700">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="w-10 h-10 bg-brand-500 rounded-xl flex items-center justify-center shadow-lg shadow-brand-500/20">
+                      <Lock className="w-5 h-5 text-white" />
+                    </div>
+                    <h3 className="text-xl font-black text-gray-900 dark:text-white tracking-tight">Cerrar Caja</h3>
+                  </div>
+                  
+                  <form onSubmit={handleClose} className="space-y-6">
+                    <div className="space-y-3">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Efectivo Real en Caja</label>
+                      <div className="relative group">
+                        <span className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 font-black text-lg group-focus-within:text-brand-500 transition-colors">S/</span>
                         <input 
                           type="number" 
                           step="0.01"
                           required
-                          className="w-full pl-10 pr-4 py-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl outline-none focus:ring-2 focus:ring-brand-500 font-black text-xl"
+                          className="w-full pl-12 pr-6 py-5 bg-white dark:bg-gray-800 border-2 border-gray-100 dark:border-gray-700 rounded-2xl outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 transition-all font-black text-2xl"
                           placeholder="0.00"
                           value={actualAmount}
                           onChange={(e) => setActualAmount(e.target.value)}
@@ -160,67 +211,142 @@ export default function CashModule() {
                     <Button 
                       type="submit" 
                       disabled={isClosing}
-                      className="w-full h-14 bg-gray-900 dark:bg-brand-600 text-white rounded-xl font-black hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl"
+                      className="w-full h-16 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-2xl font-black text-lg uppercase tracking-widest hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-gray-900/20"
                     >
-                      {isClosing ? "Cerrando..." : "Finalizar Turno"}
+                      {isClosing ? "Procesando..." : "Finalizar Turno"}
                     </Button>
+                    <p className="text-[10px] text-gray-400 text-center font-bold uppercase tracking-widest px-4">
+                      Al cerrar se calcularán diferencias automáticamente.
+                    </p>
                   </form>
                 </div>
               </div>
             </div>
           ) : (
-            <div className="bg-white dark:bg-gray-800 rounded-[32px] p-12 border-2 border-dashed border-gray-200 dark:border-gray-700 flex flex-col items-center text-center">
-              <div className="w-20 h-20 bg-gray-50 dark:bg-gray-900 rounded-full flex items-center justify-center mb-6">
-                <Wallet className="w-10 h-10 text-gray-300" />
+            <div className="bg-white dark:bg-gray-800 rounded-[32px] p-16 border-2 border-dashed border-gray-200 dark:border-gray-700 flex flex-col items-center text-center">
+              <div className="w-24 h-24 bg-gray-50 dark:bg-gray-900 rounded-[32px] flex items-center justify-center mb-8 rotate-3 shadow-inner">
+                <Wallet className="w-12 h-12 text-gray-300" />
               </div>
-              <h2 className="text-2xl font-black text-gray-900 dark:text-white mb-2">No hay caja abierta</h2>
-              <p className="text-gray-500 max-w-sm mb-8">Debes iniciar una sesión en el Punto de Venta (POS) para comenzar a registrar movimientos.</p>
-              <Button onClick={() => window.location.href = '/pos'} className="flex items-center gap-2 px-8 py-4">
-                Ir al POS
-                <ArrowRight className="w-4 h-4" />
+              <h2 className="text-3xl font-black text-gray-900 dark:text-white mb-3">No hay un turno abierto</h2>
+              <p className="text-gray-500 max-w-sm mb-10 text-lg leading-relaxed">Para comenzar a operar, debes abrir caja con un monto inicial desde el punto de venta.</p>
+              <Button onClick={() => window.location.href = '/pos'} className="flex items-center gap-3 px-10 py-5 rounded-2xl text-lg font-black uppercase tracking-widest shadow-2xl shadow-brand-500/20">
+                Ir al POS ahora
+                <ArrowRight className="w-5 h-5" />
               </Button>
             </div>
           )}
         </div>
 
-        {/* Historial de Cierres */}
-        <div className="space-y-6">
-          <div className="bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 p-6 shadow-sm">
-            <h3 className="text-lg font-black text-gray-900 dark:text-white mb-6 flex items-center gap-2">
-              <History className="w-5 h-5 text-brand-600" />
-              Últimos Arqueos
-            </h3>
-            <div className="space-y-4">
-              {history.map((session) => {
-                const isDifference = Math.abs(session.difference || 0) > 0.01;
-                return (
-                  <div key={session.id} className="p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-700">
-                    <div className="flex justify-between items-start mb-2">
-                      <div>
-                        <p className="text-xs font-black text-gray-900 dark:text-white truncate max-w-[120px]">
-                          {session.users?.full_name || 'Sistema'}
-                        </p>
-                        <p className="text-[10px] text-gray-500">{new Date(session.created_at).toLocaleDateString()}</p>
-                      </div>
-                      <div className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-tighter ${isDifference ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
-                        {isDifference ? 'Con Diferencia' : 'Cuadrado'}
-                      </div>
-                    </div>
-                    <div className="flex justify-between items-end mt-4">
-                      <div>
-                        <p className="text-[8px] text-gray-400 uppercase font-black">Efectivo Real</p>
-                        <p className="text-sm font-black text-gray-900 dark:text-white">S/ {session.actual_amount?.toFixed(2) || '0.00'}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className={`text-xs font-black ${isDifference ? 'text-red-500' : 'text-gray-400'}`}>
-                          {session.difference > 0 ? '+' : ''}{session.difference?.toFixed(2) || '0.00'}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+        {/* Historial Detallado de Arqueos */}
+        <div className="bg-white dark:bg-gray-800 rounded-[40px] border border-gray-100 dark:border-gray-700 shadow-2xl overflow-hidden mt-4">
+          <div className="p-8 border-b border-gray-100 dark:border-gray-700 flex flex-col md:flex-row md:items-center justify-between gap-6 bg-gray-50/50 dark:bg-gray-900/20">
+            <div>
+              <h3 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight flex items-center gap-3">
+                <History className="w-7 h-7 text-brand-600" />
+                Historial de Arqueos
+              </h3>
+              <p className="text-sm text-gray-500 mt-1 font-medium">Auditoría detallada de cada cierre de turno.</p>
             </div>
+
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="relative">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input 
+                  type="text" 
+                  placeholder="Buscar cajero..."
+                  className="pl-11 pr-4 py-3 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl text-xs font-bold focus:ring-2 focus:ring-brand-500 outline-none w-full sm:w-60"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              <div className="relative">
+                <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input 
+                  type="date" 
+                  className="pl-11 pr-4 py-3 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl text-xs font-bold focus:ring-2 focus:ring-brand-500 outline-none"
+                  value={dateFilter}
+                  onChange={(e) => setDateFilter(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto custom-scrollbar">
+            <table className="w-full text-left border-separate border-spacing-0">
+              <thead>
+                <tr className="bg-gray-50/50 dark:bg-gray-900/50 text-[10px] font-black text-gray-400 uppercase tracking-[2px]">
+                  <th className="px-8 py-5 border-b border-gray-100 dark:border-gray-800">Fecha Cierre</th>
+                  <th className="px-8 py-5 border-b border-gray-100 dark:border-gray-800">Responsable</th>
+                  <th className="px-8 py-5 border-b border-gray-100 dark:border-gray-800">Inicial</th>
+                  <th className="px-8 py-5 border-b border-gray-100 dark:border-gray-800">Esperado</th>
+                  <th className="px-8 py-5 border-b border-gray-100 dark:border-gray-800">Real</th>
+                  <th className="px-8 py-5 border-b border-gray-100 dark:border-gray-800">Diferencia</th>
+                  <th className="px-8 py-5 border-b border-gray-100 dark:border-gray-800">Estado</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50 dark:divide-gray-800/50">
+                {loadingHistory ? (
+                  Array(3).fill(0).map((_, i) => (
+                    <tr key={i} className="animate-pulse">
+                      <td colSpan={7} className="px-8 py-10 h-20 bg-gray-50/10"></td>
+                    </tr>
+                  ))
+                ) : filteredHistory.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-8 py-20 text-center text-gray-500 font-bold uppercase tracking-widest text-xs">
+                      No se registraron arqueos previos.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredHistory.map((session) => {
+                    const diff = session.difference || 0;
+                    const isPerfect = Math.abs(diff) < 0.01;
+                    return (
+                      <tr key={session.id} className="group hover:bg-gray-50 dark:hover:bg-gray-900/40 transition-all duration-300">
+                        <td className="px-8 py-6">
+                          <div className="flex flex-col">
+                            <span className="text-sm font-black text-gray-900 dark:text-white">
+                              {new Date(session.closed_at).toLocaleDateString("es-PE", { day: '2-digit', month: 'short', year: 'numeric' })}
+                            </span>
+                            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-0.5">
+                              {new Date(session.closed_at).toLocaleTimeString("es-PE", { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-8 py-6">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 flex items-center justify-center text-gray-500 group-hover:from-brand-500 group-hover:to-indigo-600 group-hover:text-white transition-all shadow-sm font-black text-[10px]">
+                              {(session.users?.full_name || session.users?.email || "S")[0].toUpperCase()}
+                            </div>
+                            <span className="text-sm font-bold text-gray-700 dark:text-gray-300 group-hover:text-brand-600 transition-colors">
+                              {session.users?.full_name || "Sistema"}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-8 py-6 text-sm font-bold text-gray-500">S/ {session.initial_amount.toFixed(2)}</td>
+                        <td className="px-8 py-6 text-sm font-bold text-gray-900 dark:text-white">S/ {session.expected_amount.toFixed(2)}</td>
+                        <td className="px-8 py-6 text-sm font-black text-gray-900 dark:text-white">S/ {session.actual_amount.toFixed(2)}</td>
+                        <td className="px-8 py-6">
+                          <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[11px] font-black tracking-tight ${
+                            isPerfect ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10' : 
+                            diff > 0 ? 'text-blue-600 bg-blue-50 dark:bg-blue-500/10' : 
+                            'text-red-600 bg-red-50 dark:bg-red-500/10'
+                          }`}>
+                            {isPerfect ? 'CUADRADO' : (diff > 0 ? `+ S/ ${diff.toFixed(2)}` : `- S/ ${Math.abs(diff).toFixed(2)}`)}
+                          </div>
+                        </td>
+                        <td className="px-8 py-6">
+                          <div className="flex items-center gap-2">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                            <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Cerrada</span>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>

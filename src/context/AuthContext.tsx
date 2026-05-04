@@ -82,20 +82,42 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     }, 5000);
 
-    // Heartbeat: Cada 5 minutos verificamos la sesión para mantener el token fresco y evitar bloqueos AFK
+    // Heartbeat & Refresh: Cada 4 minutos verificamos la sesión para mantener el token fresco
     const heartbeat = setInterval(async () => {
       if (isMounted) {
-        // getSession() refresca el token automáticamente y es más ligero que getUser()
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) {
+          console.warn("Heartbeat session error:", error.message);
+        } else if (session) {
           console.log("Session heartbeat: Active");
+          setUser(session.user);
+        } else {
+          setUser(null);
         }
       }
-    }, 2 * 60 * 1000);
+    }, 4 * 60 * 1000);
+
+    // Recuperación Automática: Cuando el usuario vuelve a la pestaña tras estar AFK o en otra pestaña
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === 'visible' && isMounted) {
+        console.log("Tab focused, re-validating session...");
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          setUser(session.user);
+        } else {
+          // Si no hay sesión al volver, redirigimos a login
+          setLoading(false);
+          setUser(null);
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
 
     return () => {
       isMounted = false;
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       subscription.unsubscribe();
       clearTimeout(safetyTimer);
       clearInterval(heartbeat);
