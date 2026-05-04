@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { supabaseQuery } from "@/lib/supabaseUtils";
 import { Modal } from "@/components/ui/modal";
 
 interface CreateProductModalProps {
@@ -29,14 +30,17 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess }: Creat
       return;
     }
 
-    const { error: insertError } = await supabase.from("products").insert([
-      {
-        name,
-        price: parseFloat(price),
-        image_url: imageUrl || null,
-        is_active: isActive,
-      },
-    ]);
+    const { error: insertError } = await supabaseQuery(
+      supabase.from("products").insert([
+        {
+          name,
+          price: parseFloat(price),
+          image_url: imageUrl || null,
+          is_active: isActive,
+        },
+      ])
+    );
+
 
     if (insertError) {
       setError(insertError.message);

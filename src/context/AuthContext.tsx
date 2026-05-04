@@ -36,48 +36,70 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   useEffect(() => {
-    // Verificar sesión actual
-    const checkSession = async () => {
-      try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        if (error) throw error;
-        
-        const currentUser = session?.user ?? null;
-        setUser(currentUser);
-        if (currentUser) {
-          await fetchRole(currentUser.id);
-        } else {
-          setRole(null);
-        }
-      } catch (err) {
-        console.error("Error checking session:", err);
-        setRole(null);
-        setUser(null);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    checkSession();
+    let isMounted = true;
 
     // Escuchar cambios de autenticación
+    // onAuthStateChange se dispara inmediatamente con el estado actual al suscribirse
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+      async (event, session) => {
+        if (!isMounted) return;
+
+        console.log("Auth Event:", event);
         const currentUser = session?.user ?? null;
+        
         setUser(currentUser);
+        
         if (currentUser) {
-          await fetchRole(currentUser.id);
+          try {
+            const { data } = await supabase
+              .from('users')
+              .select('role')
+              .eq('id', currentUser.id)
+              .single();
+            
+            if (isMounted) {
+              setRole(data?.role || null);
+            }
+          } catch (err) {
+            console.error("Error fetching role in auth change:", err);
+            if (isMounted) setRole(null);
+          }
         } else {
           setRole(null);
         }
-        setLoading(false);
+        
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     );
 
+    // Timeout de seguridad: Si después de 5 segundos sigue cargando, liberamos el gate
+    const safetyTimer = setTimeout(() => {
+      if (isMounted && loading) {
+        console.warn("Auth check timed out, forcing loading to false");
+        setLoading(false);
+      }
+    }, 5000);
+
+    // Heartbeat: Cada 5 minutos verificamos la sesión para mantener el token fresco y evitar bloqueos AFK
+    const heartbeat = setInterval(async () => {
+      if (isMounted) {
+        // getUser() refresca el token automáticamente si es necesario
+        await supabase.auth.getUser();
+      }
+    }, 5 * 60 * 1000);
+
+
     return () => {
+      isMounted = false;
       subscription.unsubscribe();
+      clearTimeout(safetyTimer);
+      clearInterval(heartbeat);
     };
   }, []);
+
+
 
   useEffect(() => {
     if (!loading) {

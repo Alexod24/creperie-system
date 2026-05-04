@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { supabaseQuery } from "@/lib/supabaseUtils";
 import {
   Table,
   TableBody,
@@ -30,17 +31,26 @@ export default function CatalogoModule() {
   const { role } = useAuth();
 
   useEffect(() => {
-    fetchProducts();
+    const timer = setTimeout(() => {
+      fetchProducts();
+    }, 100);
+    return () => clearTimeout(timer);
   }, []);
-
+ 
   const fetchProducts = async () => {
-    setLoading(true);
     try {
-      const { data } = await supabase
-        .from("products")
-        .select("*")
-        .order("name");
+      setLoading(true);
+      const { data, error } = await supabaseQuery(
+        supabase
+          .from("products")
+          .select("*")
+          .order("name")
+      );
       
+      if (error) {
+        console.error("Error fetching products:", error);
+      }
+
       if (data) {
         setProducts(data);
       }
@@ -50,6 +60,8 @@ export default function CatalogoModule() {
       setLoading(false);
     }
   };
+
+
 
   return (
     <div className="space-y-4">
@@ -91,8 +103,17 @@ export default function CatalogoModule() {
             <TableBody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
               {loading ? (
                 <TableRow>
-                  <TableCell className="px-5 py-4 text-center text-gray-500" colSpan={5}>
-                    Cargando catálogo...
+                  <TableCell className="px-5 py-8 text-center text-gray-500" colSpan={5}>
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-brand-500 border-t-transparent"></div>
+                      <span>Cargando catálogo...</span>
+                      <button 
+                        onClick={fetchProducts}
+                        className="text-xs text-brand-600 hover:text-brand-700 underline font-medium mt-1"
+                      >
+                        ¿Tarda demasiado? Reintentar
+                      </button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ) : products.length === 0 ? (

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { supabaseQuery } from "@/lib/supabaseUtils";
 import { useParams } from "next/navigation";
 import { 
   ChevronLeft, 
@@ -27,6 +28,7 @@ type Ingredient = {
   id: number;
   name: string;
   unit: string;
+  cost_per_unit: number;
 };
 
 type RecipeItem = {
@@ -44,6 +46,7 @@ export default function RecetarioDetail() {
   const [recipe, setRecipe] = useState<RecipeItem[]>([]);
   const [allIngredients, setAllIngredients] = useState<Ingredient[]>([]);
   const [loading, setLoading] = useState(true);
+  const [totalCost, setTotalCost] = useState(0);
   
   // States for adding new ingredient
   const [showAddModal, setShowAddModal] = useState(false);
@@ -56,38 +59,59 @@ export default function RecetarioDetail() {
     }
   }, [id]);
 
+  useEffect(() => {
+    // Calcular costo total cada vez que la receta cambia
+    const cost = recipe.reduce((acc, item) => {
+      const ingredientCost = item.ingredients?.cost_per_unit || 0;
+      return acc + (ingredientCost * item.quantity_required);
+    }, 0);
+    setTotalCost(cost);
+  }, [recipe]);
+
   const fetchData = async (productId: number) => {
     setLoading(true);
     try {
       // 1. Fetch Product
-      const { data: prodData } = await supabase
-        .from("products")
-        .select("*")
-        .eq("id", productId)
-        .single();
+      const { data: prodData } = await supabaseQuery(
+        supabase
+          .from("products")
+          .select("*")
+          .eq("id", productId)
+          .single(),
+        undefined,
+        "fetch-product-detail"
+      );
       
       if (prodData) setProduct(prodData);
 
       // 2. Fetch Recipe
-      const { data: recipeData } = await supabase
-        .from("recipes")
-        .select(`
-          id,
-          ingredient_id,
-          quantity_required,
-          ingredients ( id, name, unit )
-        `)
-        .eq("product_id", productId);
+      const { data: recipeData } = await supabaseQuery(
+        supabase
+          .from("recipes")
+          .select(`
+            id,
+            ingredient_id,
+            quantity_required,
+            ingredients ( id, name, unit, cost_per_unit )
+          `)
+          .eq("product_id", productId),
+        undefined,
+        "fetch-recipe-detail"
+      );
       
       if (recipeData) {
         setRecipe(recipeData as unknown as RecipeItem[]);
       }
 
       // 3. Fetch all ingredients (for dropdown)
-      const { data: ingData } = await supabase
-        .from("ingredients")
-        .select("*")
-        .order("name");
+      const { data: ingData } = await supabaseQuery(
+        supabase
+          .from("ingredients")
+          .select("*")
+          .order("name"),
+        undefined,
+        "fetch-all-ingredients"
+      );
       
       if (ingData) setAllIngredients(ingData);
 
@@ -96,6 +120,7 @@ export default function RecetarioDetail() {
     }
     setLoading(false);
   };
+
 
   const handleAddIngredient = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -197,24 +222,39 @@ export default function RecetarioDetail() {
                   S/ {product.price.toFixed(2)}
                 </span>
               </div>
-              <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
-                Esta receta define cuántos insumos se descontarán automáticamente del almacén cada vez que se prepare una porción de este producto.
+              
+              <div className="space-y-3 mb-6">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Costo Estimado:</span>
+                  <span className="font-semibold text-gray-800 dark:text-gray-200">S/ {totalCost.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Margen Bruto:</span>
+                  <span className={`font-bold ${product.price - totalCost > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    S/ {(product.price - totalCost).toFixed(2)} ({(( (product.price - totalCost) / product.price ) * 100).toFixed(1)}%)
+                  </span>
+                </div>
+              </div>
+
+              <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed border-t border-gray-100 dark:border-gray-700 pt-4">
+                Esta receta técnica utiliza unidades atómicas ($g, ml, u$) para garantizar la máxima precisión en el descuento de inventario.
               </p>
             </div>
           </div>
 
-          <div className="bg-brand-600 rounded-3xl p-6 text-white shadow-lg shadow-brand-500/20 relative overflow-hidden">
+          <div className="bg-gradient-to-br from-brand-600 to-purple-600 rounded-3xl p-6 text-white shadow-lg shadow-brand-500/20 relative overflow-hidden">
             <div className="relative z-10">
               <h3 className="font-bold text-lg mb-2 flex items-center gap-2">
-                <Clock className="w-5 h-5" />
-                Automatización
+                <Scale className="w-5 h-5" />
+                Deducción Atómica
               </h3>
               <p className="text-white/80 text-sm">
-                Al usar el módulo de &quot;Preparación&quot;, el sistema calculará en base a estos datos cuánto descontar de cada insumo.
+                Cada gramo cuenta. Al preparar este producto, el sistema restará exactamente las cantidades base definidas aquí.
               </p>
             </div>
             <div className="absolute -bottom-6 -right-6 w-24 h-24 bg-white/10 rounded-full blur-2xl"></div>
           </div>
+
         </div>
 
         {/* Right Column: Ingredients Table */}
@@ -242,15 +282,15 @@ export default function RecetarioDetail() {
                 <thead>
                   <tr className="bg-gray-50 dark:bg-gray-900/50">
                     <th className="px-6 py-4 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Insumo</th>
-                    <th className="px-6 py-4 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Cantidad</th>
-                    <th className="px-6 py-4 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Unidad</th>
+                    <th className="px-6 py-4 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Cantidad Base</th>
+                    <th className="px-6 py-4 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Costo Sugerido</th>
                     {role === 'admin' && <th className="px-6 py-4 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider text-right">Acciones</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                   {recipe.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="px-6 py-20 text-center text-gray-400 italic">
+                      <td colSpan={5} className="px-6 py-20 text-center text-gray-400 italic">
                         Esta receta aún no tiene insumos asignados.
                       </td>
                     </tr>
@@ -266,10 +306,10 @@ export default function RecetarioDetail() {
                           </div>
                         </td>
                         <td className="px-6 py-4 font-bold text-gray-900 dark:text-white">
-                          {item.quantity_required}
+                          {item.quantity_required} {item.ingredients?.unit}
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 uppercase">
-                          {item.ingredients?.unit}
+                        <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
+                          S/ {(item.ingredients?.cost_per_unit * item.quantity_required).toFixed(4)}
                         </td>
                         {role === 'admin' && (
                           <td className="px-6 py-4 text-right">
@@ -284,6 +324,7 @@ export default function RecetarioDetail() {
                       </tr>
                     ))
                   )}
+
                 </tbody>
               </table>
             </div>

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { supabaseQuery } from "@/lib/supabaseUtils";
 
 type SaleItem = {
   id: number;
@@ -33,27 +34,36 @@ export default function SalesList() {
   const [loadingItems, setLoadingItems] = useState(false);
 
   useEffect(() => {
-    fetchSales();
+    const timer = setTimeout(() => {
+      fetchSales();
+    }, 100);
+    return () => clearTimeout(timer);
   }, []);
 
   const fetchSales = async () => {
-    setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("sales")
-        .select(`
-          *,
-          users (
-            full_name,
-            email
-          )
-        `)
-        .order("created_at", { ascending: false });
+      setLoading(true);
+      const { data, error } = await supabaseQuery(
+        supabase
+          .from("sales")
+          .select(`
+            *,
+            users (
+              full_name,
+              email
+            )
+          `)
+          .order("created_at", { ascending: false }),
+        undefined,
+        "fetch-sales"
+      );
+
+      if (error) {
+        console.error("Error fetching sales:", error);
+      }
 
       if (data) {
         setSales(data);
-      } else if (error) {
-        console.error("Error fetching sales:", error);
       }
     } catch (err) {
       console.error("Exception fetching sales:", err);
@@ -62,23 +72,30 @@ export default function SalesList() {
     }
   };
 
+
   const fetchSaleItems = async (saleId: number) => {
     setLoadingItems(true);
     try {
-      const { data, error } = await supabase
-        .from("sale_items")
-        .select(`
-          *,
-          products (
-            name
-          )
-        `)
-        .eq("sale_id", saleId);
+      const { data, error } = await supabaseQuery(
+        supabase
+          .from("sale_items")
+          .select(`
+            *,
+            products (
+              name
+            )
+          `)
+          .eq("sale_id", saleId),
+        undefined,
+        "fetch-sale-items"
+      );
+
+      if (error) {
+        console.error("Error fetching sale items:", error);
+      }
 
       if (data) {
         setSaleItems(data);
-      } else if (error) {
-        console.error("Error fetching sale items:", error);
       }
     } catch (err) {
       console.error("Exception fetching sale items:", err);
@@ -86,6 +103,7 @@ export default function SalesList() {
       setLoadingItems(false);
     }
   };
+
 
   const handleRowClick = (sale: Sale) => {
     if (selectedSale?.id === sale.id) {

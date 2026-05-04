@@ -2,8 +2,10 @@
 
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { supabaseQuery } from "@/lib/supabaseUtils";
 import { useAuth } from "@/context/AuthContext";
 import Button from "@/components/ui/button/Button";
+import { Trash2 } from "lucide-react";
 
 type Product = {
   id: number;
@@ -25,18 +27,29 @@ export default function PreparacionModule() {
   const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
-    fetchProducts();
+    const timer = setTimeout(() => {
+      fetchProducts();
+    }, 100);
+    return () => clearTimeout(timer);
   }, []);
 
   const fetchProducts = async () => {
-    setLoading(true);
     try {
-      const { data } = await supabase
-        .from("products")
-        .select("*")
-        .eq("is_active", true)
-        .order("name");
+      setLoading(true);
+      const { data, error } = await supabaseQuery(
+        supabase
+          .from("products")
+          .select("*")
+          .eq("is_active", true)
+          .order("name"),
+        undefined,
+        "fetch-products"
+      );
       
+      if (error) {
+        console.error("Error fetching products:", error);
+      }
+
       if (data) {
         setProducts(data);
       }
@@ -46,6 +59,7 @@ export default function PreparacionModule() {
       setLoading(false);
     }
   };
+
 
   const addToPrep = (product: Product) => {
     setPrepList((prev) => {
@@ -77,6 +91,54 @@ export default function PreparacionModule() {
     );
   };
 
+  const [totalBom, setTotalBom] = useState<any[]>([]);
+
+  useEffect(() => {
+    calculateTotalBom();
+  }, [prepList]);
+
+  const calculateTotalBom = async () => {
+    if (prepList.length === 0) {
+      setTotalBom([]);
+      return;
+    }
+
+    try {
+      // Obtener todas las recetas de los productos en la lista
+      const productIds = prepList.map(p => p.id);
+      const bomMap = new Map();
+      
+      // REFACTORED FETCH WITH TIMEOUT PROTECTION:
+      const { data: recipesWithPid } = await supabaseQuery(
+        supabase
+          .from("recipes")
+          .select(`
+            product_id,
+            quantity_required,
+            ingredients ( id, name, unit )
+          `)
+          .in("product_id", productIds),
+        undefined,
+        "calculate-bom"
+      );
+
+      if (recipesWithPid) {
+        recipesWithPid.forEach((r: any) => {
+          const product = prepList.find(p => p.id === r.product_id);
+          if (product) {
+            const totalNeeded = r.quantity_required * product.quantityToPrep;
+            const existing = bomMap.get(r.ingredients.id) || { name: r.ingredients.name, unit: r.ingredients.unit, total: 0 };
+            bomMap.set(r.ingredients.id, { ...existing, total: existing.total + totalNeeded });
+          }
+        });
+        setTotalBom(Array.from(bomMap.values()));
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+
   const processPreparation = async () => {
     if (prepList.length === 0 || !user) return;
     setIsProcessing(true);
@@ -84,12 +146,15 @@ export default function PreparacionModule() {
     try {
       // Por cada producto en la lista, llamamos a la función RPC de Supabase
       for (const item of prepList) {
-        const { error } = await supabase.rpc('process_preparation', {
-          p_product_id: item.id,
-          p_quantity: item.quantityToPrep,
-          p_user_id: user.id
-        });
-
+        const { error } = await supabaseQuery(
+          supabase.rpc('process_preparation', {
+            p_product_id: item.id,
+            p_quantity: item.quantityToPrep,
+            p_user_id: user.id
+          }),
+          undefined,
+          "process-prep"
+        );
         if (error) {
           console.error("Error RPC:", error);
           throw new Error(`Error al preparar ${item.name}: ${error.message || 'Verifica que haya suficiente stock de insumos.'}`);
@@ -108,6 +173,7 @@ export default function PreparacionModule() {
     }
   };
 
+
   return (
     <div className="flex flex-col lg:flex-row gap-6 h-full">
       {/* Products Grid */}
@@ -117,7 +183,16 @@ export default function PreparacionModule() {
         </div>
         <div className="p-5 overflow-y-auto flex-1 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
           {loading ? (
-            <p className="col-span-full text-center text-gray-500 py-10">Cargando catálogo...</p>
+            <div className="col-span-full flex flex-col items-center justify-center py-12 gap-3">
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-brand-500 border-t-transparent"></div>
+              <p className="text-gray-500">Cargando catálogo...</p>
+              <button 
+                onClick={fetchProducts}
+                className="text-xs text-brand-600 hover:text-brand-700 underline font-medium"
+              >
+                ¿Tarda demasiado? Reintentar
+              </button>
+            </div>
           ) : products.length === 0 ? (
             <p className="col-span-full text-center text-gray-500 py-10">No hay productos activos.</p>
           ) : (
@@ -172,27 +247,40 @@ export default function PreparacionModule() {
               Selecciona qué vas a preparar hoy.
             </div>
           ) : (
-            prepList.map((item) => (
-              <div key={item.id} className="flex justify-between items-center bg-white dark:bg-gray-800 p-3 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm">
-                <div className="flex-1 mr-2">
-                  <h4 className="text-sm font-medium text-gray-800 dark:text-gray-100 line-clamp-2">{item.name}</h4>
-                </div>
-                
-                <div className="flex items-center space-x-2">
-                  <button onClick={() => changeQuantity(item.id, -1)} className="w-8 h-8 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-gray-600">-</button>
-                  <span className="text-base font-semibold w-6 text-center">{item.quantityToPrep}</span>
-                  <button onClick={() => changeQuantity(item.id, 1)} className="w-8 h-8 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-gray-600">+</button>
-                </div>
-                
-                <button 
-                  onClick={() => removeFromPrep(item.id)}
-                  className="ml-4 text-red-400 hover:text-red-500 flex-shrink-0"
-                  title="Eliminar"
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
-                </button>
+            <div className="space-y-4">
+              <div className="space-y-3">
+                {prepList.map((item) => (
+                  <div key={item.id} className="flex justify-between items-center bg-white dark:bg-gray-800 p-3 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm">
+                    <div className="flex-1 mr-2">
+                      <h4 className="text-sm font-medium text-gray-800 dark:text-gray-100 line-clamp-2">{item.name}</h4>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <button onClick={() => changeQuantity(item.id, -1)} className="w-8 h-8 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-gray-600">-</button>
+                      <span className="text-base font-semibold w-6 text-center">{item.quantityToPrep}</span>
+                      <button onClick={() => changeQuantity(item.id, 1)} className="w-8 h-8 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-gray-600">+</button>
+                    </div>
+                    <button onClick={() => removeFromPrep(item.id)} className="ml-4 text-red-400 hover:text-red-500 flex-shrink-0"><Trash2 className="w-4 h-4" /></button>
+                  </div>
+                ))}
               </div>
-            ))
+
+              {totalBom.length > 0 && (
+                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-900/50 rounded-2xl p-4">
+                  <h4 className="text-xs font-bold text-amber-800 dark:text-amber-400 uppercase tracking-wider mb-3">Resumen de Materiales (Atómico)</h4>
+                  <div className="grid grid-cols-1 gap-2">
+                    {totalBom.map((ing, idx) => (
+                      <div key={idx} className="flex justify-between text-sm text-amber-900 dark:text-amber-300/80">
+                        <span>{ing.name}</span>
+                        <span className="font-bold">{ing.total.toFixed(2)} {ing.unit}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-3 text-[10px] text-amber-600 dark:text-amber-500 italic">
+                    * Estas cantidades se descontarán del inventario base al confirmar.
+                  </p>
+                </div>
+              )}
+            </div>
           )}
         </div>
 
@@ -209,3 +297,5 @@ export default function PreparacionModule() {
     </div>
   );
 }
+
+

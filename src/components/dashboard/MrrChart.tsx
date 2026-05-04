@@ -1,12 +1,60 @@
 "use client";
-import React from "react";
+import React, { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { ArrowUpRight } from "lucide-react";
 import { ApexOptions } from "apexcharts";
+import { supabase } from "@/lib/supabaseClient";
+import { supabaseQuery } from "@/lib/supabaseUtils";
 
 const ReactApexChart = dynamic(() => import("react-apexcharts"), { ssr: false });
 
 const MrrChart: React.FC = () => {
+  const [salesData, setSalesData] = useState<number[]>(new Array(12).fill(0));
+  const [totalThisMonth, setTotalThisMonth] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchSales();
+  }, []);
+
+  const fetchSales = async () => {
+    try {
+      setLoading(true);
+      const startOfYear = new Date(new Date().getFullYear(), 0, 1).toISOString();
+      
+      const { data, error } = await supabaseQuery(
+        supabase
+          .from("sales")
+          .select("total, created_at")
+          .gte("created_at", startOfYear),
+        30000,
+        "mrr-fetch-sales"
+      );
+
+      if (error) throw error;
+      const monthlyTotals = new Array(12).fill(0);
+      const currentMonthIndex = new Date().getMonth();
+      let currentMonthSum = 0;
+
+      data?.forEach((sale: any) => {
+        const date = new Date(sale.created_at);
+        const month = date.getMonth();
+        monthlyTotals[month] += sale.total;
+        if (month === currentMonthIndex) {
+          currentMonthSum += sale.total;
+        }
+      });
+
+      setSalesData(monthlyTotals);
+      setTotalThisMonth(currentMonthSum);
+    } catch (err) {
+      console.error("Error fetching dashboard sales:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
   const options: ApexOptions = {
     chart: {
       type: "area",
@@ -53,25 +101,30 @@ const MrrChart: React.FC = () => {
     },
     tooltip: {
       x: { show: false },
+      y: {
+        formatter: (value) => `S/ ${value.toFixed(2)}`,
+      },
     },
   };
 
   const series = [
     {
-      name: "MRR",
-      data: [12000, 12500, 12800, 13000, 12200, 13100, 12900, 14500, 15000, 14800, 15200, 18880],
+      name: "Ventas",
+      data: salesData,
     },
   ];
 
   return (
     <div className="flex flex-col h-full bg-white dark:bg-gray-900">
       <div className="mb-2">
-        <h2 className="text-sm font-medium text-gray-500 dark:text-gray-400">MRR</h2>
+        <h2 className="text-sm font-medium text-gray-500 dark:text-gray-400">Ventas este Mes</h2>
         <div className="flex items-baseline space-x-2 mt-1">
-          <span className="text-4xl font-semibold text-gray-900 dark:text-white">$18,880</span>
+          <span className="text-4xl font-semibold text-gray-900 dark:text-white">
+            {loading ? "..." : `S/ ${totalThisMonth.toFixed(2)}`}
+          </span>
           <span className="flex items-center text-sm font-medium text-green-500">
             <ArrowUpRight className="w-4 h-4 mr-0.5" />
-            7.4%
+            Ingresos reales
           </span>
         </div>
       </div>
@@ -83,3 +136,4 @@ const MrrChart: React.FC = () => {
 };
 
 export default MrrChart;
+

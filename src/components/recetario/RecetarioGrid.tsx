@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { supabaseQuery } from "@/lib/supabaseUtils";
 import Link from "next/link";
 import { BookOpen, ChevronRight, Search } from "lucide-react";
 
@@ -26,11 +27,17 @@ export default function RecetarioGrid() {
   const fetchProducts = async () => {
     setLoading(true);
     try {
-      const { data } = await supabase
-        .from("products")
-        .select("*")
-        .eq('is_active', true)
-        .order("name");
+      const { data, error } = await supabaseQuery(
+        supabase
+          .from("products")
+          .select("*")
+          .eq('is_active', true)
+          .order("name"),
+        undefined,
+        "fetch-recetario-products"
+      );
+
+      if (error) throw error;
       
       if (data) {
         setProducts(data);

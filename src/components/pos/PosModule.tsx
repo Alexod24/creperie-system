@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { supabaseQuery } from "@/lib/supabaseUtils";
 import { useAuth } from "@/context/AuthContext";
 import Button from "@/components/ui/button/Button";
 
@@ -28,27 +29,45 @@ export default function PosModule() {
   const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
-    fetchProducts();
+    const timer = setTimeout(() => {
+      fetchProducts();
+    }, 100);
+    return () => clearTimeout(timer);
   }, []);
 
+
   const fetchProducts = async () => {
-    setLoading(true);
     try {
-      const { data } = await supabase
-        .from("products")
-        .select("*")
-        .eq("is_active", true)
-        .order("name");
+      setLoading(true);
+      console.log("POS: Fetching products...");
+      
+      const { data, error } = await supabaseQuery(
+        supabase
+          .from("products")
+          .select("*")
+          .eq("is_active", true)
+          .order("name"),
+        undefined,
+        "fetch-products"
+      );
+      
+      if (error) {
+        console.error("Error fetching products:", error);
+      }
       
       if (data) {
+        console.log("POS: Products loaded successfully");
         setProducts(data);
       }
     } catch (err) {
-      console.error("Exception fetching products:", err);
+      console.error("Exception in POS fetch:", err);
     } finally {
       setLoading(false);
     }
   };
+
+
+
 
   const addToCart = (product: Product) => {
     setCart((prevCart) => {
@@ -95,14 +114,18 @@ export default function PosModule() {
 
     try {
       // 1. Crear Venta
-      const { data: saleData, error: saleError } = await supabase
-        .from("sales")
-        .insert({
-          user_id: user.id,
-          total: total,
-        })
-        .select()
-        .single();
+      const { data: saleData, error: saleError } = await supabaseQuery(
+        supabase
+          .from("sales")
+          .insert({
+            user_id: user.id,
+            total: total,
+          })
+          .select()
+          .single(),
+        undefined,
+        "insert-sale"
+      );
 
       if (saleError) throw saleError;
 
@@ -115,18 +138,26 @@ export default function PosModule() {
         subtotal: item.subtotal,
       }));
 
-      const { error: itemsError } = await supabase
-        .from("sale_items")
-        .insert(saleItems);
+      const { error: itemsError } = await supabaseQuery(
+        supabase
+          .from("sale_items")
+          .insert(saleItems),
+        undefined,
+        "insert-sale-items"
+      );
 
       if (itemsError) throw itemsError;
 
       // 3. Descontar stock de productos
       for (const item of cart) {
-        await supabase.rpc('decrement_product_stock', {
-          p_product_id: item.id,
-          p_quantity: item.quantity
-        });
+        await supabaseQuery(
+          supabase.rpc('decrement_product_stock', {
+            p_product_id: item.id,
+            p_quantity: item.quantity
+          }),
+          undefined,
+          "decrement-stock"
+        );
       }
 
       alert("Venta registrada exitosamente");
@@ -149,7 +180,16 @@ export default function PosModule() {
         </div>
         <div className="p-5 overflow-y-auto flex-1 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
           {loading ? (
-            <p className="col-span-full text-center text-gray-500 py-10">Cargando productos...</p>
+            <div className="col-span-full flex flex-col items-center justify-center py-12 gap-3">
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-brand-500 border-t-transparent"></div>
+              <p className="text-gray-500">Cargando productos...</p>
+              <button 
+                onClick={fetchProducts}
+                className="text-xs text-brand-600 hover:text-brand-700 underline font-medium"
+              >
+                ¿Tarda demasiado? Reintentar
+              </button>
+            </div>
           ) : products.length === 0 ? (
             <p className="col-span-full text-center text-gray-500 py-10">No hay productos activos.</p>
           ) : (

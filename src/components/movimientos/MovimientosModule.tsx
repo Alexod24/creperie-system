@@ -1,20 +1,22 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { createClient } from "@supabase/supabase-js";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHeader,
-  TableRow,
-} from "../ui/table";
-import Badge from "../ui/badge/Badge";
-
-// Inicializa Supabase
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+import React, { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabaseClient";
+import { supabaseQuery } from "@/lib/supabaseUtils";
+import { 
+  Activity, 
+  Calendar, 
+  User, 
+  ArrowUpRight, 
+  ArrowDownRight, 
+  RefreshCw,
+  Search,
+  Filter,
+  Package,
+  History,
+  TrendingUp,
+  Clock
+} from "lucide-react";
 
 interface Movement {
   id: number;
@@ -31,6 +33,7 @@ export default function MovimientosModule() {
   const [movements, setMovements] = useState<Movement[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"insumos" | "productos">("insumos");
+  const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
     fetchMovements();
@@ -39,25 +42,27 @@ export default function MovimientosModule() {
   const fetchMovements = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from("inventory_movements")
-        .select(`
-          id,
-          movement_type,
-          quantity,
-          notes,
-          created_at,
-          ingredients ( name, unit ),
-          products ( name, price ),
-          users ( full_name, email )
-        `)
-        .order("created_at", { ascending: false });
+      const { data, error } = await supabaseQuery(
+        supabase
+          .from("inventory_movements")
+          .select(`
+            id,
+            movement_type,
+            quantity,
+            notes,
+            created_at,
+            ingredients ( name, unit ),
+            products ( name, price ),
+            users ( full_name, email )
+          `)
+          .order("created_at", { ascending: false })
+          .limit(100)
+      );
 
       if (error) {
         console.error("Error fetching movements:", error);
       } else {
-        // Parse the joined data according to Supabase response format
-        const formattedData = (data || []).map((m: { ingredients: Record<string, unknown>, products: Record<string, unknown>, users: Record<string, unknown>, [key: string]: unknown }) => ({
+        const formattedData = (data || []).map((m: any) => ({
           ...m,
           ingredients: Array.isArray(m.ingredients) ? m.ingredients[0] : m.ingredients,
           products: Array.isArray(m.products) ? m.products[0] : m.products,
@@ -72,160 +77,251 @@ export default function MovimientosModule() {
     }
   };
 
-  const getMovementBadge = (type: string) => {
-    switch (type) {
-      case "entrada":
-        return <Badge color="success">Entrada</Badge>;
-      case "salida":
-        return <Badge color="error">Salida</Badge>;
-      case "preparacion":
-        return <Badge color="warning">Preparación</Badge>;
-      case "venta":
-        return <Badge color="info">Venta</Badge>;
-      default:
-        return <Badge color="light">{type}</Badge>;
-    }
-  };
-
-  const getQuantityDisplay = (mov: Movement) => {
-    let prefix = "";
-    let colorClass = "text-gray-600";
-    let unit = "";
-
-    if (activeTab === "insumos") {
-      // Insumos logic: preparacion and salida are deductions, entrada is addition
-      prefix = mov.movement_type === "entrada" ? "+" : "-";
-      colorClass = mov.movement_type === "entrada" ? "text-success-600" : "text-error-600";
-      unit = mov.ingredients?.unit || "";
-    } else {
-      // Productos logic: entrada (preparacion) is addition, venta is deduction
-      prefix = mov.movement_type === "entrada" ? "+" : "-";
-      colorClass = mov.movement_type === "entrada" ? "text-success-600" : "text-error-600";
-      unit = "unidades";
-    }
-
-    return (
-      <span className={`font-semibold ${colorClass}`}>
-        {prefix}{mov.quantity} {unit}
-      </span>
-    );
-  };
-
   const filteredMovements = movements.filter((mov) => {
-    if (activeTab === "insumos") return !!mov.ingredients;
-    if (activeTab === "productos") return !!mov.products;
-    return true;
+    const isCorrectType = activeTab === "insumos" ? !!mov.ingredients : !!mov.products;
+    const itemName = activeTab === "insumos" ? mov.ingredients?.name : mov.products?.name;
+    const matchesSearch = itemName?.toLowerCase().includes(searchTerm.toLowerCase());
+    return isCorrectType && matchesSearch;
   });
+
+  // Calculate some simple metrics for the header
+  const todayMovements = movements.filter(m => 
+    new Date(m.created_at).toDateString() === new Date().toDateString()
+  ).length;
+
+  const topUser = movements.length > 0 
+    ? movements.reduce((acc, m) => {
+        const name = m.users?.full_name || m.users?.email || "Sistema";
+        acc[name] = (acc[name] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>)
+    : null;
+
+  const mostActiveUserName = topUser ? Object.entries(topUser).sort((a, b) => b[1] - a[1])[0][0] : "-";
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-xl font-bold text-gray-800 dark:text-white/90">
-            Historial de Movimientos
-          </h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            Auditoría de almacén: entradas, salidas y consumo de ingredientes.
-          </p>
+      {/* Header Metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-[24px] border border-gray-100 dark:border-gray-700 shadow-sm">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-2 bg-blue-50 dark:bg-blue-500/10 rounded-xl text-blue-600">
+              <History className="w-4 h-4" />
+            </div>
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Hoy</span>
+          </div>
+          <p className="text-2xl font-black text-gray-900 dark:text-white">{todayMovements}</p>
+          <p className="text-[10px] text-gray-500 mt-1">Registros procesados hoy</p>
         </div>
-        <button
-          onClick={fetchMovements}
-          className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shadow-sm"
-        >
-          Actualizar
-        </button>
+
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-[24px] border border-gray-100 dark:border-gray-700 shadow-sm">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-2 bg-purple-50 dark:bg-purple-500/10 rounded-xl text-purple-600">
+              <User className="w-4 h-4" />
+            </div>
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Auditor</span>
+          </div>
+          <p className="text-sm font-black text-gray-900 dark:text-white truncate" title={mostActiveUserName}>{mostActiveUserName}</p>
+          <p className="text-[10px] text-gray-500 mt-1">Usuario más activo</p>
+        </div>
+
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-[24px] border border-gray-100 dark:border-gray-700 shadow-sm">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-2 bg-green-50 dark:bg-green-500/10 rounded-xl text-green-600">
+              <TrendingUp className="w-4 h-4" />
+            </div>
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Entradas</span>
+          </div>
+          <p className="text-2xl font-black text-gray-900 dark:text-white">{movements.filter(m => m.movement_type === 'entrada').length}</p>
+          <p className="text-[10px] text-gray-500 mt-1">Abastecimiento histórico</p>
+        </div>
+
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-[24px] border border-gray-100 dark:border-gray-700 shadow-sm">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-2 bg-red-50 dark:bg-red-500/10 rounded-xl text-red-600">
+              <ArrowDownRight className="w-4 h-4" />
+            </div>
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Salidas</span>
+          </div>
+          <p className="text-2xl font-black text-gray-900 dark:text-white">{movements.filter(m => m.movement_type === 'salida' || m.movement_type === 'preparacion').length}</p>
+          <p className="text-[10px] text-gray-500 mt-1">Deducciones atómicas</p>
+        </div>
       </div>
 
-      <div className="bg-white/70 dark:bg-gray-900/70 backdrop-blur-xl border border-white/20 dark:border-gray-700/50 rounded-3xl shadow-xl overflow-hidden flex flex-col">
-        {/* Tabs */}
-        <div className="flex border-b border-gray-200/50 dark:border-gray-700/50 px-6 pt-4 bg-white/40 dark:bg-gray-800/40 backdrop-blur-sm gap-2">
-          <button
-            className={`py-3 px-6 font-semibold text-sm rounded-t-xl transition-all duration-300 ${
-              activeTab === "insumos"
-                ? "bg-brand-50 dark:bg-brand-900/30 text-brand-600 dark:text-brand-400 border-b-2 border-brand-500 shadow-sm"
-                : "text-gray-500 hover:text-gray-700 hover:bg-gray-50/50 dark:hover:text-gray-300 border-b-2 border-transparent"
-            }`}
-            onClick={() => setActiveTab("insumos")}
-          >
-            Salidas de Insumos
-          </button>
-          <button
-            className={`py-3 px-6 font-semibold text-sm rounded-t-xl transition-all duration-300 ${
-              activeTab === "productos"
-                ? "bg-brand-50 dark:bg-brand-900/30 text-brand-600 dark:text-brand-400 border-b-2 border-brand-500 shadow-sm"
-                : "text-gray-500 hover:text-gray-700 hover:bg-gray-50/50 dark:hover:text-gray-300 border-b-2 border-transparent"
-            }`}
-            onClick={() => setActiveTab("productos")}
-          >
-            Entradas de Productos
-          </button>
+      {/* Main Container */}
+      <div className="bg-white dark:bg-gray-800 rounded-[32px] border border-gray-100 dark:border-gray-700 shadow-xl overflow-hidden min-h-[600px] flex flex-col">
+        {/* Header with Search & Tabs */}
+        <div className="p-6 md:p-8 border-b border-gray-100 dark:border-gray-700 flex flex-col gap-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight flex items-center gap-2">
+                <Activity className="w-6 h-6 text-brand-600" />
+                Auditoría de Almacén
+              </h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Seguimiento detallado de cada gramo, mililitro y unidad.</p>
+            </div>
+            
+            <div className="flex gap-2">
+              <div className="relative w-full md:w-64">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input 
+                  type="text" 
+                  placeholder="Filtrar por nombre..."
+                  className="w-full pl-12 pr-4 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl text-xs focus:ring-2 focus:ring-brand-500 outline-none transition-all font-medium"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              <button 
+                onClick={fetchMovements}
+                className="p-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl text-gray-500 hover:text-brand-600 transition-all active:scale-95"
+                title="Actualizar"
+              >
+                <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
+          </div>
+
+          <div className="flex p-1.5 bg-gray-50 dark:bg-gray-900/50 rounded-2xl w-fit border border-gray-100 dark:border-gray-700/50">
+            <button 
+              onClick={() => setActiveTab("insumos")}
+              className={`px-6 py-2.5 rounded-xl text-xs font-black transition-all ${
+                activeTab === "insumos" 
+                ? "bg-white dark:bg-gray-800 text-brand-600 shadow-sm ring-1 ring-black/5" 
+                : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              MATERIA PRIMA (INSUMOS)
+            </button>
+            <button 
+              onClick={() => setActiveTab("productos")}
+              className={`px-6 py-2.5 rounded-xl text-xs font-black transition-all ${
+                activeTab === "productos" 
+                ? "bg-white dark:bg-gray-800 text-brand-600 shadow-sm ring-1 ring-black/5" 
+                : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              PRODUCTOS TERMINADOS
+            </button>
+          </div>
         </div>
 
-        {/* Content */}
-        {loading ? (
-          <div className="p-16 flex justify-center items-center">
-            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-brand-500"></div>
-          </div>
-        ) : filteredMovements.length === 0 ? (
-          <div className="p-16 flex flex-col items-center justify-center text-gray-500 space-y-3">
-            <svg className="w-12 h-12 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            <p className="font-medium">No hay movimientos registrados en {activeTab === "insumos" ? "insumos" : "productos"}.</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <Table className="w-full">
-              <TableHeader className="bg-gradient-to-r from-gray-50/80 to-gray-100/80 dark:from-gray-800/80 dark:to-gray-900/80 backdrop-blur-md">
-                <TableRow className="border-b border-gray-200/50 dark:border-gray-700/50">
-                  <TableCell isHeader className="p-5 text-gray-600 dark:text-gray-300 font-semibold tracking-wide">Fecha y Hora</TableCell>
-                  <TableCell isHeader className="p-5 text-gray-600 dark:text-gray-300 font-semibold tracking-wide">Tipo</TableCell>
-                  <TableCell isHeader className="p-5 text-gray-600 dark:text-gray-300 font-semibold tracking-wide">{activeTab === "insumos" ? "Insumo" : "Producto Final"}</TableCell>
-                  <TableCell isHeader className="p-5 text-gray-600 dark:text-gray-300 font-semibold tracking-wide">Cantidad</TableCell>
-                  <TableCell isHeader className="p-5 text-gray-600 dark:text-gray-300 font-semibold tracking-wide">Usuario</TableCell>
-                  <TableCell isHeader className="p-5 text-gray-600 dark:text-gray-300 font-semibold tracking-wide">Notas</TableCell>
-                </TableRow>
-              </TableHeader>
-              <TableBody className="divide-y divide-gray-100/50 dark:divide-gray-800/50">
-                {filteredMovements.map((mov) => (
-                  <TableRow 
-                    key={mov.id} 
-                    className="hover:bg-brand-50/40 dark:hover:bg-gray-800/60 transition-colors duration-200 group border-b border-gray-50 dark:border-gray-800/50"
-                  >
-                    <TableCell className="p-5 whitespace-nowrap text-gray-600 dark:text-gray-300 font-medium">
-                      {new Date(mov.created_at).toLocaleString("es-PE", {
-                        dateStyle: "medium",
-                        timeStyle: "short",
-                      })}
-                    </TableCell>
-                    <TableCell className="p-5">
-                      <div className="transform group-hover:scale-105 transition-transform duration-300 inline-block">
-                        {getMovementBadge(mov.movement_type)}
+        {/* Table Content */}
+        <div className="overflow-x-auto flex-1">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-gray-50/50 dark:bg-gray-900/50">
+                <th className="px-8 py-4 text-[10px] font-black text-gray-400 uppercase tracking-[2px]">Timestamp</th>
+                <th className="px-8 py-4 text-[10px] font-black text-gray-400 uppercase tracking-[2px]">Insumo / Producto</th>
+                <th className="px-8 py-4 text-[10px] font-black text-gray-400 uppercase tracking-[2px]">Movimiento</th>
+                <th className="px-8 py-4 text-[10px] font-black text-gray-400 uppercase tracking-[2px]">Cantidad</th>
+                <th className="px-8 py-4 text-[10px] font-black text-gray-400 uppercase tracking-[2px]">Responsable</th>
+                <th className="px-8 py-4 text-[10px] font-black text-gray-400 uppercase tracking-[2px]">Notas</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50 dark:divide-gray-700/50">
+              {loading ? (
+                Array(6).fill(0).map((_, i) => (
+                  <tr key={i} className="animate-pulse">
+                    <td colSpan={6} className="px-8 py-6 h-20 bg-gray-50/20"></td>
+                  </tr>
+                ))
+              ) : filteredMovements.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-8 py-32 text-center">
+                    <div className="flex flex-col items-center gap-4">
+                      <div className="w-16 h-16 bg-gray-50 dark:bg-gray-900 rounded-full flex items-center justify-center">
+                        <Filter className="w-8 h-8 text-gray-200 dark:text-gray-700" />
                       </div>
-                    </TableCell>
-                    <TableCell className="p-5 font-bold text-gray-800 dark:text-gray-100">
-                      {activeTab === "insumos"
-                        ? mov.ingredients?.name || "Desconocido"
-                        : mov.products?.name || "Desconocido"}
-                    </TableCell>
-                    <TableCell className="p-5 text-lg">{getQuantityDisplay(mov)}</TableCell>
-                    <TableCell className="p-5 text-gray-600 dark:text-gray-300">
+                      <div>
+                        <p className="text-gray-800 dark:text-white font-bold">Sin resultados</p>
+                        <p className="text-gray-500 text-sm">No hay registros que coincidan con el filtro.</p>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              ) : filteredMovements.map((mov) => {
+                const isEntry = mov.movement_type === 'entrada';
+                const isDeduction = mov.movement_type === 'salida' || mov.movement_type === 'preparacion';
+                const isVenta = mov.movement_type === 'venta';
+
+                return (
+                  <tr key={mov.id} className="group hover:bg-gray-50 dark:hover:bg-gray-900/40 transition-all duration-300">
+                    <td className="px-8 py-5">
+                      <div className="flex flex-col">
+                        <span className="text-sm font-bold text-gray-900 dark:text-white">
+                          {new Date(mov.created_at).toLocaleTimeString("es-PE", { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                        <span className="text-[10px] text-gray-500 font-medium">
+                          {new Date(mov.created_at).toLocaleDateString("es-PE", { day: '2-digit', month: 'short' })}
+                        </span>
+                      </div>
+                    </td>
+                    
+                    <td className="px-8 py-5">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-gray-50 dark:bg-gray-900 flex items-center justify-center text-gray-400 group-hover:bg-white dark:group-hover:bg-gray-800 transition-colors">
+                          {activeTab === 'insumos' ? <Package className="w-4 h-4" /> : <TrendingUp className="w-4 h-4" />}
+                        </div>
+                        <span className="text-sm font-bold text-gray-900 dark:text-white group-hover:text-brand-600 transition-colors">
+                          {activeTab === 'insumos' ? mov.ingredients?.name : mov.products?.name}
+                        </span>
+                      </div>
+                    </td>
+
+                    <td className="px-8 py-5">
+                      <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                        isEntry ? 'bg-green-50 dark:bg-green-500/10 text-green-600' :
+                        isVenta ? 'bg-blue-50 dark:bg-blue-500/10 text-blue-600' :
+                        'bg-amber-50 dark:bg-amber-500/10 text-amber-600'
+                      }`}>
+                        {isEntry ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+                        {mov.movement_type}
+                      </div>
+                    </td>
+
+                    <td className="px-8 py-5">
+                      <div className="flex items-baseline gap-1">
+                        <span className={`text-base font-black ${isEntry ? 'text-green-600' : 'text-gray-900 dark:text-white'}`}>
+                          {isEntry ? '+' : '-'}{mov.quantity.toLocaleString()}
+                        </span>
+                        <span className="text-[9px] font-bold text-gray-400 uppercase">
+                          {activeTab === 'insumos' ? mov.ingredients?.unit : 'u'}
+                        </span>
+                      </div>
+                    </td>
+
+                    <td className="px-8 py-5">
                       <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-gradient-to-br from-brand-400 to-purple-500 flex items-center justify-center text-white font-bold text-[10px] shadow-sm">
+                        <div className="w-6 h-6 rounded-full bg-gradient-to-br from-brand-500 to-indigo-600 flex items-center justify-center text-[10px] font-black text-white">
                           {(mov.users?.full_name || mov.users?.email || "S")[0].toUpperCase()}
                         </div>
-                        {mov.users?.full_name || mov.users?.email || "Sistema"}
+                        <span className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                          {mov.users?.full_name || mov.users?.email || "Sistema"}
+                        </span>
                       </div>
-                    </TableCell>
-                    <TableCell className="p-5 text-gray-500 text-sm truncate max-w-[200px]" title={mov.notes}>
-                      {mov.notes || "-"}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                    </td>
+
+                    <td className="px-8 py-5">
+                      <p className="text-[11px] text-gray-500 italic truncate max-w-[150px]" title={mov.notes}>
+                        {mov.notes || "Sin observaciones"}
+                      </p>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        
+        {/* Footer info */}
+        <div className="p-4 bg-gray-50 dark:bg-gray-900/50 border-t border-gray-100 dark:border-gray-700 flex justify-between items-center text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+          <span>Mostrando últimos 100 movimientos</span>
+          <div className="flex items-center gap-2">
+            <Clock className="w-3 h-3" />
+            <span>Actualizado: {new Date().toLocaleTimeString()}</span>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );

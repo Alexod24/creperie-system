@@ -1,46 +1,74 @@
-import React from "react";
-import Image from "next/image";
-
-const members = [
-  { id: 1, name: "Phoenix Baker", date: "Feb 2026", avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=60", active: true },
-  { id: 2, name: "Lana Steiner", date: "Jan 2026", avatar: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=60", active: true },
-  { id: 3, name: "Demi Wilkinson", date: "Mar 2026", avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=60", active: true },
-  { id: 4, name: "Candice Wu", date: "Feb 2026", avatar: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&auto=format&fit=crop&q=60", active: false },
-  { id: 5, name: "Natali Craig", date: "Mar 2026", avatar: "https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=150&auto=format&fit=crop&q=60", active: false },
-  { id: 6, name: "Orlando Diggs", date: "Apr 2026", avatar: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&auto=format&fit=crop&q=60", active: false },
-  { id: 7, name: "Drew Cano", date: "Apr 2026", avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=60", active: true },
-];
+"use client";
+import React, { useState, useEffect } from "react";
+import { AlertCircle, Package } from "lucide-react";
+import { supabase } from "@/lib/supabaseClient";
+import { supabaseQuery } from "@/lib/supabaseUtils";
 
 const TopMembers: React.FC = () => {
+  const [lowStockItems, setLowStockItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchLowStock();
+  }, []);
+
+  const fetchLowStock = async () => {
+    try {
+      const { data, error } = await supabaseQuery(
+        supabase
+          .from("ingredients")
+          .select("id, name, current_stock, min_stock, unit")
+          .order("current_stock", { ascending: true }),
+        undefined,
+        "fetch-low-stock"
+      );
+
+      if (error) throw error;
+      
+      const filtered = data?.filter((item: any) => item.current_stock <= item.min_stock) || [];
+      setLowStockItems(filtered);
+
+    } catch (err) {
+      console.error("Error fetching low stock:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div>
-      <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Top members</h2>
+      <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Alertas de Stock Bajo</h2>
       
       <div className="flex flex-col space-y-4">
-        {members.map((member) => (
-          <div key={member.id} className="flex items-center justify-between group cursor-pointer">
-            <div className="flex items-center space-x-3">
-              <div className="relative w-10 h-10 rounded-full overflow-hidden">
-                <Image 
-                  src={member.avatar} 
-                  alt={member.name} 
-                  fill 
-                  className="object-cover"
-                />
+        {loading ? (
+          <p className="text-gray-500 text-sm py-4">Cargando...</p>
+        ) : lowStockItems.length === 0 ? (
+          <div className="flex items-center gap-2 p-4 bg-green-50 dark:bg-green-900/20 rounded-xl border border-green-100 dark:border-green-800 text-green-700 dark:text-green-400">
+            <Package className="w-5 h-5" />
+            <span className="text-sm font-medium">Todo el stock está al día.</span>
+          </div>
+        ) : (
+          lowStockItems.map((item) => (
+            <div key={item.id} className="flex items-center justify-between p-3 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-100 dark:border-red-800">
+              <div className="flex items-center space-x-3">
+                <div className="flex-shrink-0 p-2 bg-red-100 dark:bg-red-900/30 rounded-lg">
+                  <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-sm font-semibold text-gray-900 dark:text-white">{item.name}</span>
+                  <span className="text-xs text-red-600 dark:text-red-400 font-medium">Quedan: {item.current_stock} {item.unit}</span>
+                </div>
               </div>
-              <div className="flex flex-col">
-                <span className="text-sm font-semibold text-gray-900 dark:text-white group-hover:text-purple-600 transition-colors">{member.name}</span>
-                <span className="text-sm text-gray-500 dark:text-gray-400">Member since {member.date}</span>
+              <div className="text-right">
+                <span className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">Mín: {item.min_stock}</span>
               </div>
             </div>
-            {member.active && (
-              <div className="w-2 h-2 rounded-full bg-green-500"></div>
-            )}
-          </div>
-        ))}
+          ))
+        )}
       </div>
     </div>
   );
 };
 
 export default TopMembers;
+

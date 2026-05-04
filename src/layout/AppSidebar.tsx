@@ -18,7 +18,9 @@ import {
   Users,
   Activity,
   Receipt,
-  LogOut
+  LogOut,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 import Image from "next/image";
 import { useAuth } from "../context/AuthContext";
@@ -50,7 +52,7 @@ const bottomItems: NavItem[] = [
 ];
 
 const AppSidebar: React.FC = () => {
-  const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
+  const { isExpanded, isMobileOpen, isHovered, setIsHovered, toggleSidebar } = useSidebar();
   const { user, signOut } = useAuth();
   const pathname = usePathname();
   const [showFeatures, setShowFeatures] = useState(true);
@@ -107,15 +109,26 @@ const AppSidebar: React.FC = () => {
       onMouseLeave={() => setIsHovered(false)}
     >
       {/* Logo Area */}
-      <div className={`p-4 flex items-center ${isExpanded || isHovered || isMobileOpen ? 'space-x-3 justify-start' : 'justify-center'}`}>
-        <div className="relative w-10 h-10 flex-shrink-0">
-          <img src="/images/logo.png" alt="Logo" className="w-full h-full object-contain" />
+      <div className={`p-4 flex items-center justify-between`}>
+        <div className={`flex items-center ${isExpanded || isHovered || isMobileOpen ? 'space-x-3' : ''}`}>
+          <div className="relative w-10 h-10 flex-shrink-0">
+            <img src="/images/logo.png" alt="Logo" className="w-full h-full object-contain" />
+          </div>
+          {(isExpanded || isHovered || isMobileOpen) && (
+            <span className="font-bold text-gray-900 dark:text-white text-lg leading-tight">
+              Gustitos del Virrey
+            </span>
+          )}
         </div>
-        {(isExpanded || isHovered || isMobileOpen) && (
-          <span className="font-bold text-gray-900 dark:text-white text-lg leading-tight">
-            Gustitos del Virrey
-          </span>
-        )}
+        
+        {/* Toggle Button for Desktop */}
+        <button
+          onClick={() => toggleSidebar()}
+          className={`hidden lg:flex items-center justify-center w-8 h-8 rounded-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-brand-600 transition-all ${!isExpanded ? 'rotate-180 ml-2' : ''}`}
+          title={isExpanded ? "Encoger Sidebar" : "Expandir Sidebar"}
+        >
+          <ChevronLeft className="w-5 h-5" />
+        </button>
       </div>
 
       {/* Search Bar */}
