@@ -85,10 +85,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     // Heartbeat: Cada 5 minutos verificamos la sesión para mantener el token fresco y evitar bloqueos AFK
     const heartbeat = setInterval(async () => {
       if (isMounted) {
-        // getUser() refresca el token automáticamente si es necesario
-        await supabase.auth.getUser();
+        // getSession() refresca el token automáticamente y es más ligero que getUser()
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          console.log("Session heartbeat: Active");
+        }
       }
-    }, 5 * 60 * 1000);
+    }, 2 * 60 * 1000);
 
 
     return () => {

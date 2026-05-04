@@ -2,10 +2,14 @@
 import React, { useState } from "react";
 import { useCash } from "@/context/CashContext";
 import { useToast } from "@/context/ToastContext";
-import { Wallet, ArrowRight, Loader2 } from "lucide-react";
+import { Wallet, ArrowRight, Loader2, X } from "lucide-react";
 import Button from "@/components/ui/button/Button";
 
-export default function CashSessionModal() {
+interface CashSessionModalProps {
+  onClose?: () => void;
+}
+
+export default function CashSessionModal({ onClose }: CashSessionModalProps) {
   const { activeSession, openSession, loading } = useCash();
   const { showToast } = useToast();
   const [amount, setAmount] = useState("");
@@ -30,7 +34,16 @@ export default function CashSessionModal() {
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-300">
-      <div className="bg-white dark:bg-gray-800 rounded-[32px] w-full max-w-md shadow-2xl overflow-hidden border border-white/10 animate-in zoom-in-95 duration-300">
+      <div className="bg-white dark:bg-gray-800 rounded-[32px] w-full max-w-md shadow-2xl overflow-hidden border border-white/10 animate-in zoom-in-95 duration-300 relative">
+        {onClose && (
+          <button 
+            onClick={onClose}
+            className="absolute top-6 right-6 z-20 text-white/50 hover:text-white transition-colors p-2 hover:bg-white/10 rounded-full"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        )}
+
         <div className="p-8 bg-gradient-to-br from-brand-600 to-brand-800 text-white relative">
           <div className="relative z-10">
             <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center mb-4 backdrop-blur-md">
@@ -89,3 +102,4 @@ export default function CashSessionModal() {
     </div>
   );
 }
+

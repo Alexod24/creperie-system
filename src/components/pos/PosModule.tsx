@@ -24,20 +24,28 @@ type CartItem = Product & {
 };
 
 export default function PosModule() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { activeSession } = useCash();
   const { showToast } = useToast();
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showCashModal, setShowCashModal] = useState(false);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
+    // Si no hay sesión activa al entrar, mostramos el modal automáticamente
+    if (!activeSession && !loading) {
+      setShowCashModal(true);
+    }
+  }, [activeSession, loading]);
+
+
+  useEffect(() => {
+    if (!authLoading) {
       fetchProducts();
-    }, 100);
-    return () => clearTimeout(timer);
-  }, []);
+    }
+  }, [authLoading, user]);
 
 
   const fetchProducts = async () => {
@@ -74,8 +82,15 @@ export default function PosModule() {
 
 
   const addToCart = (product: Product) => {
+    const existingItem = cart.find((item) => item.id === product.id);
+    const currentQty = existingItem ? existingItem.quantity : 0;
+
+    if (currentQty + 1 > product.stock) {
+      showToast("Sin Stock", `No puedes agregar más de ${product.stock} unidades de este producto.`, "warning");
+      return;
+    }
+
     setCart((prevCart) => {
-      const existingItem = prevCart.find((item) => item.id === product.id);
       if (existingItem) {
         return prevCart.map((item) =>
           item.id === product.id
@@ -102,7 +117,15 @@ export default function PosModule() {
     setCart((prevCart) =>
       prevCart.map((item) => {
         if (item.id === id) {
-          const newQty = Math.max(1, item.quantity + delta);
+          const newQty = item.quantity + delta;
+          
+          if (newQty > item.stock) {
+            showToast("Límite de Stock", `Solo hay ${item.stock} unidades disponibles.`, "warning");
+            return item;
+          }
+          
+          if (newQty < 1) return item;
+          
           return { ...item, quantity: newQty, subtotal: newQty * item.price };
         }
         return item;
@@ -113,7 +136,15 @@ export default function PosModule() {
   const total = cart.reduce((sum, item) => sum + item.subtotal, 0);
 
   const processSale = async () => {
-    if (cart.length === 0 || !user || !activeSession) return;
+    if (cart.length === 0 || !user) return;
+    
+    // Si no hay sesión activa, abrimos el modal de apertura
+    if (!activeSession) {
+      setShowCashModal(true);
+      showToast("Caja Cerrada", "Debes abrir la caja para registrar ventas.", "warning");
+      return;
+    }
+
     setIsProcessing(true);
 
     try {
@@ -302,7 +333,9 @@ export default function PosModule() {
       </div>
       
       {/* Modal de Apertura de Caja */}
-      <CashSessionModal />
+      {showCashModal && !activeSession && (
+        <CashSessionModal onClose={() => setShowCashModal(false)} />
+      )}
     </div>
   );
 }

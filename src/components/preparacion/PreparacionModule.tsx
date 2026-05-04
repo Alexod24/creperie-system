@@ -21,7 +21,7 @@ type PrepItem = Product & {
 };
 
 export default function PreparacionModule() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { showToast } = useToast();
   const [products, setProducts] = useState<Product[]>([]);
   const [prepList, setPrepList] = useState<PrepItem[]>([]);
@@ -29,11 +29,10 @@ export default function PreparacionModule() {
   const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
+    if (!authLoading) {
       fetchProducts();
-    }, 100);
-    return () => clearTimeout(timer);
-  }, []);
+    }
+  }, [authLoading, user]);
 
   const fetchProducts = async () => {
     try {

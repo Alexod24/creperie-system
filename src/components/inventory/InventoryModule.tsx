@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { supabaseQuery } from "@/lib/supabaseUtils";
+import { useAuth } from "@/context/AuthContext";
 import {
   Table,
   TableBody,
@@ -40,6 +41,7 @@ export default function InventoryModule() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedIng, setSelectedIng] = useState<Ingredient | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const { user, loading: authLoading } = useAuth();
   
   // Entry States
   const [entryQty, setEntryQty] = useState("");
@@ -47,8 +49,10 @@ export default function InventoryModule() {
   const [entryCost, setEntryCost] = useState("");
 
   useEffect(() => {
-    fetchIngredients();
-  }, []);
+    if (!authLoading) {
+      fetchIngredients();
+    }
+  }, [authLoading, user]);
 
   const fetchIngredients = async () => {
     try {

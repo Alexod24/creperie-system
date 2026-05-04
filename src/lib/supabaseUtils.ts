@@ -8,7 +8,7 @@ import { supabase } from "./supabaseClient";
  */
 export async function supabaseQuery<T>(
   query: any, 
-  timeoutMs: number = 60000,
+  timeoutMs: number = 120000,
   label: string = "unnamed-query"
 ): Promise<T> {
   let timeoutId: any;

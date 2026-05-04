@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import { useAuth } from "../context/AuthContext";
+import { useConfirm } from "../context/ConfirmContext";
 
 type NavItem = {
   name: string;
@@ -35,17 +36,20 @@ type NavItem = {
 
 const navItems: NavItem[] = [
   { name: "Punto de Venta (POS)", icon: <ShoppingCart className="w-5 h-5" />, path: "/pos" },
+  { name: "Caja", icon: <Wallet className="w-5 h-5" />, path: "/caja" },
+  { name: "Ventas", icon: <Receipt className="w-5 h-5" />, path: "/ventas" },
   { name: "Preparación", icon: <Utensils className="w-5 h-5" />, path: "/preparacion" },
-  { name: "Inventario", icon: <Package className="w-5 h-5" />, path: "/inventario" },
 ];
 
 const managementItems: NavItem[] = [
   { name: "Dashboard", icon: <BarChart2 className="w-5 h-5" />, path: "/" },
   { name: "Movimientos", icon: <Activity className="w-5 h-5" />, path: "/movimientos" },
-  { name: "Recetario", icon: <BookOpen className="w-5 h-5" />, path: "/recetario" },
-  { name: "Caja", icon: <Wallet className="w-5 h-5" />, path: "/caja" },
+];
+
+const resourceItems: NavItem[] = [
+  { name: "Inventario", icon: <Package className="w-5 h-5" />, path: "/inventario" },
   { name: "Catálogo", icon: <List className="w-5 h-5" />, path: "/catalogo" },
-  { name: "Ventas", icon: <Receipt className="w-5 h-5" />, path: "/ventas" },
+  { name: "Recetario", icon: <BookOpen className="w-5 h-5" />, path: "/recetario" },
 ];
 
 const bottomItems: NavItem[] = [
@@ -56,8 +60,22 @@ const bottomItems: NavItem[] = [
 const AppSidebar: React.FC = () => {
   const { isExpanded, isMobileOpen, isHovered, setIsHovered, toggleSidebar } = useSidebar();
   const { user, signOut } = useAuth();
+  const { confirm } = useConfirm();
   const pathname = usePathname();
-  const [showFeatures, setShowFeatures] = useState(true);
+
+  const handleSignOut = async () => {
+    const isConfirmed = await confirm({
+      title: "Cerrar Sesión",
+      message: "¿Estás seguro de que deseas cerrar sesión? Tendrás que volver a ingresar tus credenciales.",
+      confirmText: "Cerrar Sesión",
+      cancelText: "Cancelar",
+      type: "danger"
+    });
+
+    if (isConfirmed) {
+      await signOut();
+    }
+  };
 
   const renderNav = (items: NavItem[]) => {
     return (
@@ -156,49 +174,28 @@ const AppSidebar: React.FC = () => {
       {/* Main Navigation */}
       <div className="flex-1 px-3 overflow-y-auto no-scrollbar">
         {(isExpanded || isHovered || isMobileOpen) && (
-           <h3 className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 mt-4">Acciones Rápidas</h3>
+           <h3 className="px-3 text-[10px] font-black text-gray-400 uppercase tracking-[1.5px] mb-2 mt-4">Acciones Rápidas</h3>
         )}
         {renderNav(navItems)}
 
         {(isExpanded || isHovered || isMobileOpen) && (
-           <h3 className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 mt-6">Gestión y Control</h3>
+           <h3 className="px-3 text-[10px] font-black text-gray-400 uppercase tracking-[1.5px] mb-2 mt-6">Auditoría y Control</h3>
         )}
         {renderNav(managementItems)}
 
         {(isExpanded || isHovered || isMobileOpen) && (
-           <h3 className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 mt-6">Configuración</h3>
+           <h3 className="px-3 text-[10px] font-black text-gray-400 uppercase tracking-[1.5px] mb-2 mt-6">Recursos</h3>
+        )}
+        {renderNav(resourceItems)}
+
+        {(isExpanded || isHovered || isMobileOpen) && (
+           <h3 className="px-3 text-[10px] font-black text-gray-400 uppercase tracking-[1.5px] mb-2 mt-6">Sistema</h3>
         )}
         {renderNav(bottomItems)}
       </div>
 
       {/* Bottom Area */}
       <div className="px-3 pb-4 space-y-4">
-        {showFeatures && (isExpanded || isHovered || isMobileOpen) && (
-          <div className="bg-gray-50 rounded-lg p-4 relative mt-4">
-            <button onClick={() => setShowFeatures(false)} className="absolute top-2 right-2 text-gray-400 hover:text-gray-600">
-              <X className="w-4 h-4" />
-            </button>
-            <h4 className="text-sm font-semibold text-gray-900 mb-1">New features available!</h4>
-            <p className="text-sm text-gray-500 mb-3">
-              Check out the new dashboard view. Pages now load faster.
-            </p>
-            <div className="rounded-md overflow-hidden bg-gray-200 relative w-full h-24 mb-3">
-              <Image 
-                 src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=500&auto=format&fit=crop&q=60" 
-                 alt="New features video" 
-                 fill 
-                 className="object-cover opacity-80"
-              />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <PlayCircle className="w-8 h-8 text-white opacity-90" />
-              </div>
-            </div>
-            <div className="flex items-center space-x-3 text-sm">
-              <button onClick={() => setShowFeatures(false)} className="text-gray-500 font-medium hover:text-gray-700">Dismiss</button>
-              <button className="text-purple-600 font-medium hover:text-purple-700">What&apos;s new?</button>
-            </div>
-          </div>
-        )}
 
         {/* User Profile */}
         {(isExpanded || isHovered || isMobileOpen) && (
@@ -218,7 +215,7 @@ const AppSidebar: React.FC = () => {
                 </div>
               </div>
               <button 
-                onClick={signOut}
+                onClick={handleSignOut}
                 title="Cerrar sesión"
                 className="text-gray-400 hover:text-red-500 transition-colors flex-shrink-0"
               >
