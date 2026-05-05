@@ -24,6 +24,7 @@ import {
   Wallet,
   Trash2
 } from "lucide-react";
+import { ThemeToggleButton } from "@/components/common/ThemeToggleButton";
 import Image from "next/image";
 import { useAuth } from "../context/AuthContext";
 import { useConfirm } from "../context/ConfirmContext";
@@ -205,9 +206,13 @@ const AppSidebar: React.FC = () => {
       {/* Bottom Area */}
       <div className="px-3 pb-4 space-y-4">
 
-        {/* User Profile */}
+        {/* User Profile & Theme Toggle */}
         {(isExpanded || isHovered || isMobileOpen) && (
           <div className="pt-4 border-t border-gray-200 mt-2">
+            <div className="flex items-center justify-between mb-4 px-1">
+               <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Apariencia</span>
+               <ThemeToggleButton />
+            </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3 overflow-hidden">
                 <div className="w-10 h-10 rounded-full flex-shrink-0 bg-brand-100 dark:bg-brand-900/50 border border-brand-200 dark:border-brand-800 flex items-center justify-center text-brand-700 dark:text-brand-400 font-bold text-lg shadow-sm">

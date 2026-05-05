@@ -12,6 +12,17 @@ const outfit = Outfit({
   subsets: ["latin"],
 });
 
+export const metadata = {
+  title: {
+    template: "%s | Gustitos del Virrey",
+    default: "Gustitos del Virrey - Sistema de Gestión",
+  },
+  description: "Sistema inteligente para la gestión de creperías, inventario y ventas.",
+  icons: {
+    icon: "/images/logo.png",
+  }
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{

@@ -21,10 +21,10 @@ const AppHeader: React.FC = () => {
             <Menu className="w-6 h-6" />
           </button>
           <Link href="/" className="flex items-center space-x-2">
-            <div className="w-6 h-6 bg-purple-600 rounded-md flex items-center justify-center">
-               <div className="w-2 h-2 bg-white rounded-full"></div>
+            <div className="w-8 h-8 flex-shrink-0">
+               <img src="/images/logo.png" alt="Logo" className="w-full h-full object-contain" />
             </div>
-            <span className="font-semibold text-gray-900">Untitled UI</span>
+            <span className="font-bold text-gray-900 dark:text-white">Gustitos del Virrey</span>
           </Link>
         </div>
         <div className="flex items-center space-x-2">

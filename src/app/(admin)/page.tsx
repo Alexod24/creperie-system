@@ -8,8 +8,8 @@ import RecentPosts from "@/components/dashboard/RecentPosts";
 import TopMembers from "@/components/dashboard/TopMembers";
 
 export const metadata: Metadata = {
-  title: "Dashboard | Untitled UI",
-  description: "SaaS Dashboard Replicated",
+  title: "Dashboard",
+  description: "Panel principal de control del sistema",
 };
 
 export default function Dashboard() {
