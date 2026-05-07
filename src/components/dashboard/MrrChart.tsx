@@ -23,11 +23,11 @@ const MrrChart: React.FC = () => {
       const startOfYear = new Date(new Date().getFullYear(), 0, 1).toISOString();
       
       const { data, error } = await supabaseQuery(
-        supabase
+        () => supabase
           .from("sales")
           .select("total, created_at")
           .gte("created_at", startOfYear),
-        30000,
+        0,
         "mrr-fetch-sales"
       );
 

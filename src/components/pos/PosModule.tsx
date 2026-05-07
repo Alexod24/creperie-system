@@ -32,6 +32,8 @@ export default function PosModule() {
   const [loading, setLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showCashModal, setShowCashModal] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<"efectivo" | "yape">("efectivo");
+  const [paymentReference, setPaymentReference] = useState("");
 
   useEffect(() => {
     // Si no hay sesión activa al entrar, mostramos el modal automáticamente
@@ -42,34 +44,38 @@ export default function PosModule() {
 
 
   useEffect(() => {
-    if (!authLoading) {
-      fetchProducts();
+    const controller = new AbortController();
+    if (!authLoading && user?.id) {
+      fetchProducts(controller.signal);
     }
-  }, [authLoading, user]);
+    return () => controller.abort();
+  }, [authLoading, user?.id]);
 
 
-  const fetchProducts = async () => {
+  const fetchProducts = async (signal?: AbortSignal) => {
     try {
       setLoading(true);
       console.log("POS: Fetching products...");
       
-      const { data, error } = await supabaseQuery<any>(
+      const { data, error } = await supabaseQuery<Product[]>(
         () => supabase
           .from("products")
           .select("*")
           .eq("is_active", true)
           .order("name"),
-        2,
-        "fetch-products"
+        0,
+        "fetch-products",
+        signal
       );
       
       if (error) {
-        console.error("Error fetching products:", error);
+        console.error("Error in POS fetch:", error);
       }
-      
+
       if (data) {
-        console.log("POS: Products loaded successfully");
         setProducts(data);
+        console.log("POS: Products loaded successfully. Count:", data.length);
+        if (data.length > 0) console.log("POS: First product sample:", data[0]);
       }
     } catch (err) {
       console.error("Exception in POS fetch:", err);
@@ -145,6 +151,11 @@ export default function PosModule() {
       return;
     }
 
+    if (paymentMethod === "yape" && (!paymentReference || paymentReference.length < 3)) {
+      showToast("Código Requerido", "Ingresa el código de 3 dígitos de Yape.", "warning");
+      return;
+    }
+
     setIsProcessing(true);
 
     try {
@@ -155,7 +166,9 @@ export default function PosModule() {
           .insert({
             user_id: user.id,
             total: total,
-            session_id: activeSession.id
+            session_id: activeSession.id,
+            payment_method: paymentMethod,
+            payment_reference: paymentMethod === "yape" ? paymentReference : null
           })
           .select()
           .single(),
@@ -198,6 +211,8 @@ export default function PosModule() {
 
       showToast("Éxito", "Venta registrada exitosamente", "success");
       setCart([]); // Limpiar carrito
+      setPaymentReference(""); // Limpiar código yape
+      setPaymentMethod("efectivo"); // Resetear a efectivo
       fetchProducts(); // Refrescar stock
     } catch (error) {
       console.error("Error al procesar la venta:", error);
@@ -226,7 +241,7 @@ export default function PosModule() {
                 ¿Tarda demasiado? Reintentar
               </button>
             </div>
-          ) : products.length === 0 ? (
+          ) : !Array.isArray(products) || products.length === 0 ? (
             <p className="col-span-full text-center text-gray-500 py-10">No hay productos activos.</p>
           ) : (
             products.map((prod) => (
@@ -322,6 +337,47 @@ export default function PosModule() {
             <span className="text-gray-600 dark:text-gray-400 font-medium">Total</span>
             <span className="text-2xl font-bold text-gray-900 dark:text-white">S/ {total.toFixed(2)}</span>
           </div>
+
+          {/* Selector de Método de Pago */}
+          <div className="mb-6 space-y-3">
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Método de Pago</label>
+            <div className="grid grid-cols-2 gap-2 p-1 bg-gray-100 dark:bg-gray-900 rounded-xl">
+              <button
+                onClick={() => setPaymentMethod("efectivo")}
+                className={`py-2 px-4 rounded-lg text-xs font-black transition-all ${
+                  paymentMethod === "efectivo"
+                    ? "bg-white dark:bg-gray-800 text-brand-600 shadow-sm"
+                    : "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                }`}
+              >
+                EFECTIVO
+              </button>
+              <button
+                onClick={() => setPaymentMethod("yape")}
+                className={`py-2 px-4 rounded-lg text-xs font-black transition-all ${
+                  paymentMethod === "yape"
+                    ? "bg-brand-500 text-white shadow-lg shadow-brand-500/20"
+                    : "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                }`}
+              >
+                YAPE
+              </button>
+            </div>
+
+            {paymentMethod === "yape" && (
+              <div className="animate-in slide-in-from-top-2 duration-300">
+                <input
+                  type="text"
+                  maxLength={3}
+                  placeholder="Código Yape (3 dígitos)"
+                  className="w-full px-4 py-3 bg-white dark:bg-gray-800 border-2 border-brand-500/20 rounded-xl outline-none focus:border-brand-500 text-sm font-bold text-center tracking-[4px]"
+                  value={paymentReference}
+                  onChange={(e) => setPaymentReference(e.target.value.replace(/\D/g, ""))}
+                />
+              </div>
+            )}
+          </div>
+
           <Button 
             className="w-full h-12 text-lg font-semibold"
             disabled={cart.length === 0 || isProcessing}

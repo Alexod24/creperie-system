@@ -31,28 +31,27 @@ export default function PreparacionModule() {
   const [insufficientItems, setInsufficientItems] = useState<any[]>([]);
 
   useEffect(() => {
-    if (!authLoading) {
-      fetchProducts();
+    const controller = new AbortController();
+    if (!authLoading && user?.id) {
+      fetchProducts(controller.signal);
     }
-  }, [authLoading, user]);
+    return () => controller.abort();
+  }, [authLoading, user?.id]);
 
-  const fetchProducts = async () => {
+  const fetchProducts = async (signal?: AbortSignal) => {
     try {
       setLoading(true);
-      const { data, error } = await supabaseQuery(
-        supabase
+      const { data } = await supabaseQuery<any[]>(
+        () => supabase
           .from("products")
           .select("*")
           .eq("is_active", true)
           .order("name"),
-        undefined,
-        "fetch-products"
+        0,
+        "fetch-products",
+        signal
       );
       
-      if (error) {
-        console.error("Error fetching products:", error);
-      }
-
       if (data) {
         setProducts(data);
       }
@@ -113,7 +112,7 @@ export default function PreparacionModule() {
       
       // REFACTORED FETCH WITH TIMEOUT PROTECTION:
       const { data: recipesWithPid } = await supabaseQuery(
-        supabase
+        () => supabase
           .from("recipes")
           .select(`
             product_id,
@@ -121,7 +120,7 @@ export default function PreparacionModule() {
             ingredients ( id, name, unit, current_stock )
           `)
           .in("product_id", productIds),
-        undefined,
+        0,
         "calculate-bom"
       );
 
@@ -173,21 +172,16 @@ export default function PreparacionModule() {
       console.log(`Iniciando preparación (ignoreStock: ${ignoreStock})...`);
       
       for (const item of prepList) {
-        const { error } = await supabaseQuery(
-          supabase.rpc('process_preparation', {
+        await supabaseQuery(
+          () => supabase.rpc('process_preparation', {
             p_product_id: item.id,
             p_quantity: item.quantityToPrep,
             p_user_id: user.id,
             p_ignore_stock: ignoreStock
           }),
-          undefined,
+          0,
           "process-prep"
         );
-        
-        if (error) {
-          console.error(`Error preparando ${item.name}:`, error);
-          throw new Error(`Error al preparar ${item.name}: ${error.message}`);
-        }
       }
 
       showToast(

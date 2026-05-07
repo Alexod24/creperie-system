@@ -14,6 +14,10 @@ type CashSession = {
   actual_amount: number | null;
   difference: number | null;
   status: 'open' | 'closed';
+  users?: {
+    full_name: string;
+    email: string;
+  };
 };
 
 type CashContextType = {
@@ -39,17 +43,29 @@ export const CashProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [activeSession, setActiveSession] = useState<CashSession | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchActiveSession = async () => {
-    if (!user) return;
+  const fetchActiveSession = async (forceLoading = false) => {
     try {
-      setLoading(true);
-      const { data, error } = await supabaseQuery(
-        supabase
+      if (forceLoading || !activeSession) setLoading(true);
+      
+      if (!user) {
+        setActiveSession(null);
+        return;
+      }
+
+      // Usar supabaseQuery con factory para mayor estabilidad
+      const { data } = await supabaseQuery<any>(
+        () => supabase
           .from("cash_sessions")
-          .select("*")
+          .select(`
+            *,
+            users (
+              full_name,
+              email
+            )
+          `)
           .eq("status", "open")
           .maybeSingle(),
-        undefined,
+        0,
         "fetch-active-session"
       );
 
@@ -65,15 +81,22 @@ export const CashProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Solo re-inicializar si el usuario cambia de verdad (ID)
   useEffect(() => {
-    fetchActiveSession();
-  }, [user]);
+    if (user?.id) {
+      // Cargamos la sesión sin forzar estado de carga global si ya hay datos
+      fetchActiveSession();
+    } else {
+      setActiveSession(null);
+      setLoading(false);
+    }
+  }, [user?.id]);
 
   const openSession = async (amount: number) => {
     if (!user) return;
     try {
-      const { data, error } = await supabaseQuery(
-        supabase
+      const { data } = await supabaseQuery<any>(
+        () => supabase
           .from("cash_sessions")
           .insert({
             user_id: user.id,
@@ -82,12 +105,11 @@ export const CashProvider: React.FC<{ children: React.ReactNode }> = ({ children
           })
           .select()
           .single(),
-        undefined,
+        0,
         "open-cash-session"
       );
 
-      if (error) throw error;
-      setActiveSession(data);
+      if (data) setActiveSession(data);
     } catch (err) {
       console.error("Error opening session:", err);
       throw err;
@@ -97,7 +119,7 @@ export const CashProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const closeSession = async (actualAmount: number) => {
     if (!activeSession) return;
     try {
-      // 1. Obtener totales de ventas
+      // 1. Obtener totales de ventas con desglose
       const { data: totals, error: totalsError } = await supabase.rpc('get_session_totals', {
         p_session_id: activeSession.id
       });
@@ -105,10 +127,14 @@ export const CashProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (totalsError) throw totalsError;
 
       const salesTotal = totals[0]?.sales_total || 0;
-      const expectedAmount = activeSession.initial_amount + salesTotal;
+      const cashTotal = totals[0]?.cash_total || 0;
+      const yapeTotal = totals[0]?.yape_total || 0;
+      
+      // EL monto esperado en efectivo es: Fondo Inicial + Ventas en Efectivo
+      const expectedAmount = activeSession.initial_amount + cashTotal;
       const difference = actualAmount - expectedAmount;
 
-      // 2. Cerrar sesión
+      // 2. Cerrar sesión guardando el desglose
       const { error } = await supabaseQuery(
         supabase
           .from("cash_sessions")
@@ -117,6 +143,8 @@ export const CashProvider: React.FC<{ children: React.ReactNode }> = ({ children
             expected_amount: expectedAmount,
             actual_amount: actualAmount,
             difference: difference,
+            cash_sales_total: cashTotal,
+            yape_sales_total: yapeTotal,
             status: 'closed'
           })
           .eq("id", activeSession.id),

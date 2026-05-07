@@ -18,26 +18,27 @@ const MetricsColumn: React.FC = () => {
 
   const fetchMetrics = async () => {
     try {
+      console.log("MetricsColumn: Starting fetch...");
       setLoading(true);
       const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
       
       // 1. Monthly Sales count
       const { count: salesCount } = await supabaseQuery(
-        supabase
+        () => supabase
           .from("sales")
           .select("*", { count: "exact", head: true })
           .gte("created_at", startOfMonth),
-        undefined,
+        0,
         "sales-count"
       );
 
       // 2. Monthly Income sum
       const { data: incomeData } = await supabaseQuery(
-        supabase
+        () => supabase
           .from("sales")
           .select("total")
           .gte("created_at", startOfMonth),
-        undefined,
+        0,
         "monthly-income"
       );
       
@@ -45,10 +46,10 @@ const MetricsColumn: React.FC = () => {
 
       // 3. Critical Ingredients count
       const { data: ingredients } = await supabaseQuery(
-        supabase
+        () => supabase
           .from("ingredients")
           .select("current_stock, min_stock"),
-        undefined,
+        0,
         "critical-ingredients"
       );
       

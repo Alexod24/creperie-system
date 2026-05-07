@@ -16,13 +16,22 @@ export default function AdminLayout({
   const { loading, user } = useAuth();
 
   console.log("AdminLayout Render - Loading:", loading, "| User:", user ? user.email : "Nulo");
+
+  // Redirección si no hay usuario
+  React.useEffect(() => {
+    if (!loading && !user) {
+      console.log("AdminLayout: No user found, redirecting to /signin");
+      window.location.href = "/signin";
+    }
+  }, [loading, user]);
   const mainContentMargin = isMobileOpen
     ? "ml-0"
     : isExpanded || isHovered
     ? "lg:ml-[280px]"
     : "lg:ml-[80px]";
 
-  if (loading) {
+  // Solo mostrar pantalla de carga si es el arranque inicial (sin usuario)
+  if (loading && !user) {
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center bg-white dark:bg-gray-900 gap-4">
         <div className="relative">
@@ -31,7 +40,7 @@ export default function AdminLayout({
         </div>
         <div className="flex flex-col items-center">
           <h2 className="text-xl font-bold text-gray-900 dark:text-white">Cargando Sistema</h2>
-          <p className="text-gray-500 dark:text-gray-400 animate-pulse">Verificando sesión...</p>
+          <p className="text-gray-500 dark:text-gray-400 animate-pulse">Iniciando aplicación...</p>
         </div>
       </div>
     );

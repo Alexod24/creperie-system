@@ -62,7 +62,7 @@ const bottomItems: NavItem[] = [
 
 const AppSidebar: React.FC = () => {
   const { isExpanded, isMobileOpen, isHovered, setIsHovered, toggleSidebar } = useSidebar();
-  const { user, role, signOut } = useAuth();
+  const { user, role, logout } = useAuth();
   const { confirm } = useConfirm();
   const pathname = usePathname();
 
@@ -76,7 +76,7 @@ const AppSidebar: React.FC = () => {
     });
 
     if (isConfirmed) {
-      await signOut();
+      await logout();
     }
   };
 

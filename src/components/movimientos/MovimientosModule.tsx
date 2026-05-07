@@ -54,16 +54,18 @@ export default function MovimientosModule() {
   const { user, loading: authLoading } = useAuth();
 
   useEffect(() => {
-    if (!authLoading) {
-      fetchMovements();
+    const controller = new AbortController();
+    if (!authLoading && user?.id) {
+      fetchMovements(controller.signal);
     }
-  }, [authLoading, user]);
+    return () => controller.abort();
+  }, [authLoading, user?.id]);
 
-  const fetchMovements = async () => {
+  const fetchMovements = async (signal?: AbortSignal) => {
     try {
       setLoading(true);
-      const { data, error } = await supabaseQuery(
-        supabase
+      const { data } = await supabaseQuery<any[]>(
+        () => supabase
           .from("inventory_movements")
           .select(`
             id,
@@ -79,12 +81,13 @@ export default function MovimientosModule() {
             users ( full_name, email )
           `)
           .order("created_at", { ascending: false })
-          .limit(200)
+          .limit(200),
+        0,
+        "fetch-movements",
+        signal
       );
 
-      if (error) {
-        console.error("Error fetching movements:", error);
-      } else {
+      if (data) {
         const formattedData = (data || []).map((m: any) => ({
           ...m,
           ingredients: Array.isArray(m.ingredients) ? m.ingredients[0] : m.ingredients,

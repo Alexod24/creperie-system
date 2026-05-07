@@ -1,71 +1,87 @@
 import { supabase } from "./supabaseClient";
 
 /**
- * Realiza una consulta a Supabase con un tiempo límite (timeout) para evitar bloqueos infinitos de la UI.
- * @param query La promesa o query de Supabase
- * @param timeoutMs Tiempo máximo de espera en milisegundos (default 120000)
- * @param label Etiqueta para identificar la consulta en logs (opcional)
+ * Realiza una consulta a Supabase y devuelve { data, error, count }.
+ * Implementa reintentos y manejo de timeouts.
  */
 export async function supabaseQuery<T>(
   queryOrFactory: any, 
   retries: number = 2, 
   label: string = "unnamed-query",
-  timeoutMs: number = 120000
-): Promise<T> {
-  let lastError: any;
+  signal?: AbortSignal
+): Promise<{ data: T | null; error: any; count: number | null }> {
+  const timeoutMs = 45000;
+  let attempt = 0;
 
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    let timeoutId: any;
-    
+  while (attempt <= retries) {
     try {
       if (attempt > 0) {
-        // Cálculo de espera con backoff exponencial y jitter (aleatoriedad)
-        // Intento 1: ~1-2s, Intento 2: ~4-5s
-        const delay = Math.min(1000 * Math.pow(2, attempt) + Math.random() * 1000, 10000);
-        console.warn(`Reintento ${attempt}/${retries} para [${label}] en ${Math.round(delay)}ms...`);
-        await new Promise(res => setTimeout(res, delay));
+        console.log(`[supabaseQuery] REINTENTANDO (${attempt}/${retries}): ${label}`);
+        // Pequeña espera antes de reintentar
+        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+      } else {
+        console.log(`[supabaseQuery] EJECUTANDO: ${label}`);
       }
-
+      
+      let queryToExec = typeof queryOrFactory === 'function' ? queryOrFactory() : queryOrFactory;
+      
+      if (signal) {
+        if (queryToExec.abortSignal) {
+          queryToExec = queryToExec.abortSignal(signal);
+        }
+        if (signal.aborted) {
+          throw new DOMException("Aborted", "AbortError");
+        }
+      }
+      
       const timeoutPromise = new Promise((_, reject) => {
-        timeoutId = setTimeout(() => {
-          const error = new Error(`Timeout de conexión con Supabase [${label}] tras ${timeoutMs / 1000}s`);
-          reject(error);
+        const timer = setTimeout(() => {
+          reject(new Error(`Timeout de seguridad (${timeoutMs/1000}s) en [${label}]`));
         }, timeoutMs);
+        
+        // Limpiar el timer si la señal se aborta
+        if (signal) {
+          signal.addEventListener('abort', () => {
+            clearTimeout(timer);
+            reject(new DOMException("Aborted", "AbortError"));
+          }, { once: true });
+        }
       });
 
-      // Si es una función (factory), obtenemos una instancia nueva para cada reintento.
-      // Esto es CRUCIAL porque una promesa fallida de Supabase no se puede "reiniciar".
-      const queryToExec = typeof queryOrFactory === 'function' ? queryOrFactory() : queryOrFactory;
-      
       const result = await Promise.race([
-        Promise.resolve(queryToExec), 
+        Promise.resolve(queryToExec),
         timeoutPromise
       ]) as any;
-      
-      if (timeoutId) clearTimeout(timeoutId);
 
-      // Si Supabase devuelve un error en el objeto de respuesta, lo lanzamos para reintentar
       if (result && result.error) {
         throw result.error;
       }
 
-      return result as T;
+      console.log(`[supabaseQuery] ÉXITO: ${label}`);
+      
+      return {
+        data: (result?.data !== undefined ? result.data : result) as T,
+        error: null,
+        count: result?.count ?? null
+      };
 
     } catch (error: any) {
-      if (timeoutId) clearTimeout(timeoutId);
-      lastError = error;
+      const isAbortError = error.name === 'AbortError' || error.message?.includes('abort') || error.code === '20';
+      
+      if (isAbortError) {
+        console.log(`[supabaseQuery] CANCELADO: ${label}`);
+        return { data: null, error: error, count: null };
+      }
 
-      // Solo reintentamos si no es el último intento
-      if (attempt < retries) {
-        // Log detallado para diagnóstico
-        console.warn(`Fallo en [${label}] (Intento ${attempt + 1}):`, error.message || error);
-        continue;
+      console.error(`[supabaseQuery] FALLO en ${label} (Intento ${attempt}):`, error.message || error);
+
+      if (attempt >= retries) {
+        return { data: null, error: error, count: null };
       }
       
-      console.error(`Error definitivo en [${label}] tras ${retries + 1} intentos:`, error);
-      throw error;
+      attempt++;
     }
   }
-  
-  throw lastError;
+
+  return { data: null, error: new Error("Unknown error in supabaseQuery"), count: null };
 }
