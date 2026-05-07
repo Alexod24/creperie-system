@@ -14,7 +14,8 @@ import {
   Info,
   Scale,
   Clock,
-  ChevronRight
+  ChevronRight,
+  Edit2
 } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
@@ -56,6 +57,15 @@ export default function RecetarioDetail() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [newIngredientId, setNewIngredientId] = useState<string>("");
   const [newQuantity, setNewQuantity] = useState<string>("");
+
+  // States for editing existing ingredient
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingItem, setEditingItem] = useState<RecipeItem | null>(null);
+  const [editQuantity, setEditQuantity] = useState<string>("");
+
+  // States for product price editing
+  const [isEditingPrice, setIsEditingPrice] = useState(false);
+  const [tempPrice, setTempPrice] = useState<string>("");
 
   useEffect(() => {
     if (id) {
@@ -141,6 +151,7 @@ export default function RecetarioDetail() {
 
       if (error) throw error;
       
+      showToast("Éxito", "Insumo añadido correctamente", "success");
       // Refresh
       fetchData(product.id);
       setShowAddModal(false);
@@ -150,6 +161,65 @@ export default function RecetarioDetail() {
       showToast("Error", "Error al añadir ingrediente. Tal vez ya existe en la receta.", "error");
       console.error(err);
     }
+  };
+
+  const handleUpdateIngredient = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingItem || !editQuantity || !product) return;
+
+    try {
+      const { error } = await supabase
+        .from("recipes")
+        .update({
+          quantity_required: Number(editQuantity)
+        })
+        .eq("id", editingItem.id);
+
+      if (error) throw error;
+      
+      showToast("Éxito", "Cantidad actualizada correctamente", "success");
+      // Refresh
+      fetchData(product.id);
+      setShowEditModal(false);
+      setEditingItem(null);
+      setEditQuantity("");
+    } catch (err) {
+      showToast("Error", "No se pudo actualizar la cantidad.", "error");
+      console.error(err);
+    }
+  };
+
+  const openEditModal = (item: RecipeItem) => {
+    setEditingItem(item);
+    setEditQuantity(item.quantity_required.toString());
+    setShowEditModal(true);
+  };
+
+  const handleUpdateProductPrice = async () => {
+    if (!product || !tempPrice) return;
+    const newPrice = Number(tempPrice);
+    if (isNaN(newPrice)) return;
+
+    try {
+      const { error } = await supabase
+        .from("products")
+        .update({ price: newPrice })
+        .eq("id", product.id);
+
+      if (error) throw error;
+      
+      setProduct({ ...product, price: newPrice });
+      setIsEditingPrice(false);
+      showToast("Éxito", "Precio de venta actualizado", "success");
+    } catch (err) {
+      showToast("Error", "No se pudo actualizar el precio.", "error");
+      console.error(err);
+    }
+  };
+
+  const startEditingPrice = () => {
+    setTempPrice(product?.price.toString() || "");
+    setIsEditingPrice(true);
   };
 
   const handleRemoveIngredient = async (recipeId: number) => {
@@ -227,9 +297,46 @@ export default function RecetarioDetail() {
                 <span className="px-3 py-1 bg-green-50 dark:bg-green-500/10 text-green-600 dark:text-green-400 text-xs font-bold rounded-full uppercase tracking-wider">
                   Configurado
                 </span>
-                <span className="text-xl font-bold text-gray-900 dark:text-white">
-                  S/ {product.price.toFixed(2)}
-                </span>
+                
+                {isEditingPrice ? (
+                  <div className="flex items-center gap-2">
+                    <input 
+                      type="number" 
+                      step="0.01"
+                      className="w-20 px-2 py-1 text-sm font-bold border border-brand-500 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                      value={tempPrice}
+                      onChange={(e) => setTempPrice(e.target.value)}
+                      autoFocus
+                    />
+                    <button 
+                      onClick={handleUpdateProductPrice}
+                      className="p-1 text-green-600 hover:bg-green-50 rounded"
+                    >
+                      <Save className="w-4 h-4" />
+                    </button>
+                    <button 
+                      onClick={() => setIsEditingPrice(false)}
+                      className="p-1 text-red-600 hover:bg-red-50 rounded"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl font-bold text-gray-900 dark:text-white">
+                      S/ {product.price.toFixed(2)}
+                    </span>
+                    {role === 'admin' && (
+                      <button 
+                        onClick={startEditingPrice}
+                        className="p-1 text-gray-400 hover:text-brand-600 transition-colors"
+                        title="Editar precio de venta"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
               
               <div className="space-y-3 mb-6">
@@ -322,12 +429,22 @@ export default function RecetarioDetail() {
                         </td>
                         {role === 'admin' && (
                           <td className="px-6 py-4 text-right">
-                            <button 
-                              onClick={() => handleRemoveIngredient(item.id)}
-                              className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all rounded-lg"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                            <div className="flex items-center justify-end gap-2">
+                              <button 
+                                onClick={() => openEditModal(item)}
+                                className="p-2 text-gray-400 hover:text-brand-600 hover:bg-brand-50 dark:hover:bg-brand-500/10 transition-all rounded-lg"
+                                title="Editar cantidad"
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </button>
+                              <button 
+                                onClick={() => handleRemoveIngredient(item.id)}
+                                className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all rounded-lg"
+                                title="Eliminar de la receta"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
                           </td>
                         )}
                       </tr>
@@ -396,6 +513,56 @@ export default function RecetarioDetail() {
                 >
                   <Save className="w-4 h-4" />
                   Guardar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Ingredient Modal */}
+      {showEditModal && editingItem && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-gray-800 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="p-6 bg-brand-600 text-white">
+              <h3 className="text-xl font-bold">Editar Cantidad</h3>
+              <p className="text-sm text-brand-100">Ajustando: {editingItem.ingredients.name}</p>
+            </div>
+            
+            <form onSubmit={handleUpdateIngredient} className="p-6 space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-gray-700 dark:text-gray-300">
+                  Nueva Cantidad ({editingItem.ingredients.unit})
+                </label>
+                <input 
+                  type="number" 
+                  step="0.001"
+                  placeholder="Ej: 0.5 o 100"
+                  className="w-full bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-brand-500 text-sm font-bold"
+                  value={editQuantity}
+                  onChange={(e) => setEditQuantity(e.target.value)}
+                  autoFocus
+                  required
+                />
+                <p className="text-[10px] text-gray-500 dark:text-gray-400">
+                  El cambio afectará a todas las preparaciones futuras de este producto.
+                </p>
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button 
+                  type="button" 
+                  onClick={() => setShowEditModal(false)}
+                  className="flex-1 px-4 py-3 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-xl font-bold text-sm hover:bg-gray-200 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit" 
+                  className="flex-1 px-4 py-3 bg-brand-600 text-white rounded-xl font-bold text-sm hover:bg-brand-700 shadow-lg shadow-brand-500/20 transition-all flex items-center justify-center gap-2"
+                >
+                  <Save className="w-4 h-4" />
+                  Actualizar
                 </button>
               </div>
             </form>

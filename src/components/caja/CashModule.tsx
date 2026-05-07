@@ -16,7 +16,10 @@ import {
   Search,
   Calendar,
   ChevronRight,
-  Filter
+  Filter,
+  Smartphone,
+  Banknote,
+  Calculator
 } from "lucide-react";
 import Button from "@/components/ui/button/Button";
 import { supabaseQuery } from "@/lib/supabaseUtils";
@@ -29,7 +32,12 @@ export default function CashModule() {
   
   const [actualAmount, setActualAmount] = useState("");
   const [isClosing, setIsClosing] = useState(false);
-  const [sessionTotals, setSessionTotals] = useState({ total: 0, count: 0 });
+  const [sessionTotals, setSessionTotals] = useState({ 
+    total: 0, 
+    cash: 0, 
+    yape: 0, 
+    count: 0 
+  });
   const [history, setHistory] = useState<any[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -69,6 +77,8 @@ export default function CashModule() {
       if (data && data[0]) {
         setSessionTotals({
           total: Number(data[0].sales_total),
+          cash: Number(data[0].cash_total),
+          yape: Number(data[0].yape_total),
           count: Number(data[0].sales_count)
         });
       }
@@ -167,29 +177,76 @@ export default function CashModule() {
               </div>
 
               <div className="p-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <div className="p-6 bg-gray-50 dark:bg-gray-900/50 rounded-[24px] border border-gray-100 dark:border-gray-700 group hover:border-brand-500/30 transition-colors">
-                    <div className="w-10 h-10 bg-gray-100 dark:bg-gray-800 rounded-xl flex items-center justify-center mb-4">
-                      <Wallet className="w-5 h-5 text-gray-400" />
+                <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                  {/* Fila 1: Bases y Métodos */}
+                  <div className="p-4 bg-white dark:bg-gray-900/50 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-7 h-7 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center">
+                        <Wallet className="w-3.5 h-3.5 text-gray-400" />
+                      </div>
+                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-wider">Monto Inicial</p>
                     </div>
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1">Monto Inicial (Fondo)</p>
-                    <p className="text-2xl font-black text-gray-900 dark:text-white">S/ {activeSession.initial_amount.toFixed(2)}</p>
-                  </div>
-                  
-                  <div className="p-6 bg-gray-50 dark:bg-gray-900/50 rounded-[24px] border border-gray-100 dark:border-gray-700 group hover:border-emerald-500/30 transition-colors">
-                    <div className="w-10 h-10 bg-emerald-50 dark:bg-emerald-500/10 rounded-xl flex items-center justify-center mb-4">
-                      <TrendingUp className="w-5 h-5 text-emerald-600" />
-                    </div>
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1">Ventas del Turno ({sessionTotals.count})</p>
-                    <p className="text-2xl font-black text-emerald-600">S/ {sessionTotals.total.toFixed(2)}</p>
+                    <p className="text-lg font-black text-gray-900 dark:text-white">S/ {activeSession.initial_amount.toFixed(2)}</p>
                   </div>
 
-                  <div className="sm:col-span-2 p-8 bg-gradient-to-br from-brand-600 to-brand-800 rounded-[28px] text-white shadow-2xl shadow-brand-500/20 relative overflow-hidden">
+                  <div className="p-4 bg-white dark:bg-gray-900/50 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-7 h-7 bg-emerald-50 dark:bg-emerald-500/10 rounded-lg flex items-center justify-center">
+                        <Banknote className="w-3.5 h-3.5 text-emerald-600" />
+                      </div>
+                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-wider">Ventas Efectivo</p>
+                    </div>
+                    <p className="text-lg font-black text-gray-900 dark:text-white">S/ {sessionTotals.cash.toFixed(2)}</p>
+                  </div>
+
+                  <div className="p-4 bg-white dark:bg-gray-900/50 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-7 h-7 bg-brand-50 dark:bg-brand-500/10 rounded-lg flex items-center justify-center">
+                        <Smartphone className="w-3.5 h-3.5 text-brand-600" />
+                      </div>
+                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-wider">Ventas Yape</p>
+                    </div>
+                    <p className="text-lg font-black text-brand-600">S/ {sessionTotals.yape.toFixed(2)}</p>
+                  </div>
+
+                  {/* Fila 2: Totales */}
+                  <div className="p-4 bg-white dark:bg-gray-900/50 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-7 h-7 bg-amber-50 dark:bg-amber-500/10 rounded-lg flex items-center justify-center">
+                        <TrendingUp className="w-3.5 h-3.5 text-amber-600" />
+                      </div>
+                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-wider">Total Ventas</p>
+                    </div>
+                    <p className="text-lg font-black text-amber-600">S/ {sessionTotals.total.toFixed(2)}</p>
+                  </div>
+
+                  <div className="md:col-span-2 p-4 bg-white dark:bg-gray-900/50 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 bg-indigo-50 dark:bg-indigo-500/10 rounded-lg flex items-center justify-center">
+                        <Calculator className="w-4 h-4 text-indigo-600" />
+                      </div>
+                      <div>
+                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-wider">Balance General (Fondo + Ventas)</p>
+                        <p className="text-lg font-black text-indigo-600">S/ {(activeSession.initial_amount + sessionTotals.total).toFixed(2)}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-wider">Operaciones</p>
+                      <p className="text-lg font-black text-gray-900 dark:text-white">{sessionTotals.count}</p>
+                    </div>
+                  </div>
+                  
+                  {/* Card Principal de Arqueo */}
+                  <div className="sm:col-span-2 md:col-span-3 p-8 bg-gradient-to-br from-emerald-600 to-brand-600 rounded-[28px] text-white shadow-2xl shadow-emerald-500/20 relative overflow-hidden mt-2">
                     <div className="relative z-10">
-                      <p className="text-[10px] font-black text-brand-200 uppercase tracking-widest mb-2">Total Estimado en Caja</p>
-                      <h4 className="text-5xl font-black tracking-tighter">S/ {(activeSession.initial_amount + sessionTotals.total).toFixed(2)}</h4>
-                      <p className="text-xs text-brand-200/80 mt-4 max-w-xs leading-relaxed">
-                        Este monto es la suma del fondo inicial más todas las ventas registradas hasta este momento.
+                      <div className="flex items-center gap-2 mb-2">
+                        <Wallet className="w-4 h-4 text-emerald-200" />
+                        <p className="text-[10px] font-black text-emerald-100 uppercase tracking-widest">Monto Esperado en Físico (Efectivo)</p>
+                      </div>
+                      <h4 className="text-5xl font-black tracking-tighter">S/ {(activeSession.initial_amount + sessionTotals.cash).toFixed(2)}</h4>
+                      <p className="text-xs text-emerald-50/80 mt-4 max-w-sm leading-relaxed font-medium">
+                        Este es el dinero que debes tener **físicamente** en el cajón. 
+                        (Fondo S/ {activeSession.initial_amount.toFixed(2)} + Ventas S/ {sessionTotals.cash.toFixed(2)})
                       </p>
                     </div>
                     <div className="absolute top-0 right-0 p-8 opacity-10">

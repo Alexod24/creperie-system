@@ -145,6 +145,29 @@ export default function PosModule() {
     );
   };
 
+  const handleManualQuantity = (id: number, val: string) => {
+    const numVal = parseInt(val);
+    if (isNaN(numVal)) return; // Ignorar si no es número
+    
+    setCart((prevCart) =>
+      prevCart.map((item) => {
+        if (item.id === id) {
+          // Validar stock
+          if (numVal > item.stock) {
+            showToast("Límite de Stock", `Solo hay ${item.stock} unidades disponibles.`, "warning");
+            const safeVal = item.stock;
+            return { ...item, quantity: safeVal, subtotal: safeVal * item.price };
+          }
+          
+          if (numVal < 1) return { ...item, quantity: 1, subtotal: item.price };
+          
+          return { ...item, quantity: numVal, subtotal: numVal * item.price };
+        }
+        return item;
+      })
+    );
+  };
+
   const total = cart.reduce((sum, item) => sum + item.subtotal, 0);
 
   const processSale = async () => {
@@ -317,10 +340,25 @@ export default function PosModule() {
                   <p className="text-xs text-brand-500 font-medium mt-0.5">S/ {item.price.toFixed(2)}</p>
                 </div>
                 
-                <div className="flex items-center space-x-2">
-                  <button onClick={() => changeQuantity(item.id, -1)} className="w-6 h-6 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-gray-600">-</button>
-                  <span className="text-sm font-semibold w-4 text-center">{item.quantity}</span>
-                  <button onClick={() => changeQuantity(item.id, 1)} className="w-6 h-6 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-gray-600">+</button>
+                <div className="flex items-center space-x-1.5 bg-gray-50 dark:bg-gray-900/50 p-1 rounded-lg border border-gray-100 dark:border-gray-700">
+                  <button 
+                    onClick={() => changeQuantity(item.id, -1)} 
+                    className="w-7 h-7 rounded-md bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-700 shadow-sm transition-colors font-bold"
+                  >
+                    -
+                  </button>
+                  <input 
+                    type="text" 
+                    className="w-10 h-7 bg-transparent text-center text-sm font-black text-gray-900 dark:text-white outline-none focus:text-brand-500"
+                    value={item.quantity}
+                    onChange={(e) => handleManualQuantity(item.id, e.target.value)}
+                  />
+                  <button 
+                    onClick={() => changeQuantity(item.id, 1)} 
+                    className="w-7 h-7 rounded-md bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-700 shadow-sm transition-colors font-bold"
+                  >
+                    +
+                  </button>
                 </div>
                 
                 <div className="w-16 text-right ml-2">

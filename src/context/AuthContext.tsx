@@ -30,6 +30,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
+  // Log inicial para saber dónde estamos renderizando
+  if (typeof window === "undefined") {
+    console.log("[AUTH-SERVER] Renderizando AuthProvider en el servidor");
+  }
+
   const logout = async () => {
     try {
       await supabase.auth.signOut();
@@ -104,7 +109,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!isMounted) return;
       
-      console.log(`AuthContext Event: ${event} | User: ${session?.user?.email || "none"}`);
+      console.log(`[AUTH-CLIENT] Evento: ${event} | Usuario: ${session?.user?.email || "ninguno"}`);
       
       if (session?.user) {
         await loadFullProfile(session.user);
