@@ -69,7 +69,13 @@ export default function PosModule() {
       );
       
       if (error) {
-        console.error("Error in POS fetch:", error);
+        // Silenciar errores de cancelación (AbortError)
+        const isAbortError = error.name === 'AbortError' || error.message?.includes('Aborted');
+        if (!isAbortError) {
+          console.error("Error in POS fetch:", error);
+        } else {
+          console.log("POS: fetch-products cancelado (AbortError)");
+        }
       }
 
       if (data) {

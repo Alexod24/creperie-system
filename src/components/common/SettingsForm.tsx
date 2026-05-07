@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/context/AuthContext";
+import { useConfirm } from "@/context/ConfirmContext";
+import { Trash2, AlertTriangle, RefreshCcw } from "lucide-react";
 
 type Settings = {
   id: number;
@@ -16,6 +18,8 @@ export default function SettingsForm() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState({ text: "", type: "" });
   const { role } = useAuth();
+  const { confirm } = useConfirm();
+  const [isClearing, setIsClearing] = useState(false);
   
   const isAdmin = role === 'admin';
 
@@ -66,6 +70,49 @@ export default function SettingsForm() {
       setTimeout(() => setMessage({ text: "", type: "" }), 3000);
     }
     setSaving(false);
+  };
+
+  const handleClearDatabase = async () => {
+    const isConfirmed = await confirm({
+      title: "⚠️ LIMPIEZA TOTAL DE DATOS",
+      message: "Esta acción ELIMINARÁ permanentemente todas las ventas, arqueos de caja, mermas e historial de movimientos. Los productos e insumos NO se verán afectados. ¿Estás seguro?",
+      type: "danger",
+      confirmText: "Sí, Limpiar Historial",
+      cancelText: "Cancelar"
+    });
+
+    if (!isConfirmed) return;
+
+    try {
+      setIsClearing(true);
+      setMessage({ text: "Iniciando limpieza de datos...", type: "info" });
+
+      // 1. Eliminar Items de Venta (por FK)
+      await supabase.from("sale_items").delete().neq("id", 0);
+      
+      // 2. Eliminar Ventas
+      await supabase.from("sales").delete().neq("id", 0);
+      
+      // 3. Eliminar Mermas
+      await supabase.from("mermas").delete().neq("id", 0);
+      
+      // 4. Eliminar Movimientos de Inventario
+      await supabase.from("inventory_movements").delete().neq("id", 0);
+      
+      // 5. Eliminar Sesiones de Caja
+      await supabase.from("cash_sessions").delete().neq("id", 0);
+
+      // 6. Resetear stock de productos e insumos a 0 (opcional, pero sugerido para "limpieza")
+      await supabase.from("products").update({ stock: 0 }).neq("id", 0);
+      await supabase.from("ingredients").update({ current_stock: 0 }).neq("id", 0);
+
+      setMessage({ text: "Base de datos limpiada correctamente. El sistema está listo para pruebas.", type: "success" });
+    } catch (err) {
+      console.error("Error clearing database:", err);
+      setMessage({ text: "Error crítico durante la limpieza.", type: "error" });
+    } finally {
+      setIsClearing(false);
+    }
   };
 
   if (loading) {
@@ -161,6 +208,43 @@ export default function SettingsForm() {
           )}
         </form>
       </div>
+
+      {isAdmin && (
+        <div className="mt-8 p-8 bg-red-50/50 dark:bg-red-900/10 rounded-3xl border border-red-100 dark:border-red-900/30">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="space-y-1">
+              <h3 className="text-lg font-black text-red-600 flex items-center gap-2 uppercase tracking-tight">
+                <AlertTriangle className="w-5 h-5" />
+                Mantenimiento de Datos
+              </h3>
+              <p className="text-sm text-red-500 font-medium">
+                Borra todo el historial operativo para iniciar una nueva etapa de pruebas o producción.
+              </p>
+            </div>
+            
+            <button
+              type="button"
+              onClick={handleClearDatabase}
+              disabled={isClearing}
+              className="px-8 py-4 bg-red-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-red-700 transition-all shadow-xl shadow-red-500/20 disabled:opacity-50 flex items-center gap-3"
+            >
+              {isClearing ? (
+                <RefreshCcw className="w-4 h-4 animate-spin" />
+              ) : (
+                <Trash2 className="w-4 h-4" />
+              )}
+              Limpiar Base de Datos
+            </button>
+          </div>
+          
+          <div className="mt-4 p-4 bg-white/50 dark:bg-gray-800/50 rounded-xl border border-red-100 dark:border-red-900/20">
+            <p className="text-[10px] text-red-400 font-bold uppercase tracking-widest leading-relaxed">
+              * Esta operación eliminará: Ventas, Arqueos, Mermas y Movimientos. <br />
+              * Los Productos, Insumos, Recetas y Usuarios se mantendrán intactos.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

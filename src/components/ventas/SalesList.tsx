@@ -49,7 +49,7 @@ export default function SalesList() {
   const [loadingItems, setLoadingItems] = useState(false);
   const { user, loading: authLoading } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
-  const [dateFilter, setDateFilter] = useState("");
+  const [dateFilter, setDateFilter] = useState(new Date().toISOString().split("T")[0]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -106,9 +106,23 @@ export default function SalesList() {
     }
   };
 
+  const dateInputRef = React.useRef<HTMLInputElement>(null);
+
   const handleViewDetails = (sale: Sale) => {
     setSelectedSale(sale);
     fetchSaleDetails(sale.id);
+  };
+
+  const openDatePicker = () => {
+    if (dateInputRef.current) {
+      try {
+        // @ts-ignore
+        dateInputRef.current.showPicker();
+      } catch (e) {
+        dateInputRef.current.focus();
+        dateInputRef.current.click();
+      }
+    }
   };
 
   const filteredSales = (Array.isArray(sales) ? sales : []).filter(sale => {
@@ -153,9 +167,13 @@ export default function SalesList() {
           <p className="text-[10px] text-gray-500 mt-1">Monto total acumulado</p>
         </div>
 
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-[24px] border border-gray-100 dark:border-gray-700 shadow-sm">
+        <div 
+          className="bg-white dark:bg-gray-800 p-6 rounded-[24px] border border-gray-100 dark:border-gray-700 shadow-sm cursor-pointer hover:border-brand-500 transition-all group"
+          onClick={() => setDateFilter(new Date().toISOString().split('T')[0])}
+          title="Filtrar ventas de hoy"
+        >
           <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 bg-blue-50 dark:bg-blue-500/10 rounded-xl text-blue-600">
+            <div className="p-2 bg-blue-50 dark:bg-blue-500/10 rounded-xl text-blue-600 group-hover:bg-brand-600 group-hover:text-white transition-colors">
               <Clock className="w-4 h-4" />
             </div>
             <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Hoy</span>
@@ -182,22 +200,37 @@ export default function SalesList() {
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input 
                 type="text" 
-                placeholder="ID o Referencia..."
-                className="pl-11 pr-4 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl text-xs focus:ring-2 focus:ring-brand-500 outline-none transition-all w-full md:w-48 font-medium"
+                placeholder="ID..."
+                className="pl-11 pr-4 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl text-xs focus:ring-2 focus:ring-brand-500 outline-none transition-all w-full md:w-32 font-medium"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <div className="relative">
-              <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <div className="relative group">
+              <button 
+                onClick={openDatePicker}
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-brand-600 transition-colors z-10"
+                title="Seleccionar fecha"
+              >
+                <Calendar className="w-4 h-4" />
+              </button>
               <input 
+                ref={dateInputRef}
                 type="date" 
-                className="pl-11 pr-4 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl text-xs focus:ring-2 focus:ring-brand-500 outline-none transition-all font-medium"
+                className="pl-11 pr-4 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl text-xs focus:ring-2 focus:ring-brand-500 outline-none transition-all w-full md:w-36 font-medium"
                 value={dateFilter}
                 onChange={(e) => setDateFilter(e.target.value)}
               />
             </div>
-            <Button variant="outline" className="rounded-2xl h-10 px-4">
+            {dateFilter && (
+              <button 
+                onClick={() => setDateFilter("")}
+                className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-500 hover:text-brand-600 rounded-2xl text-xs font-bold transition-all border border-gray-200 dark:border-gray-700 hover:border-brand-500"
+              >
+                Ver Todas
+              </button>
+            )}
+            <Button variant="outline" className="rounded-2xl h-10 px-4 text-xs font-bold uppercase tracking-widest">
               <Download className="w-4 h-4 mr-2" />
               Exportar
             </Button>
@@ -235,7 +268,11 @@ export default function SalesList() {
                 filteredSales.map((sale) => (
                   <tr key={sale.id} className="group hover:bg-gray-50 dark:hover:bg-gray-900/40 transition-colors">
                     <td className="px-8 py-5">
-                      <div className="flex flex-col">
+                      <div 
+                        className="flex flex-col cursor-pointer hover:opacity-70 transition-opacity"
+                        onClick={() => setDateFilter(sale.created_at.split('T')[0])}
+                        title="Filtrar por este día"
+                      >
                         <span className="text-sm font-bold text-gray-900 dark:text-white">#{sale.id}</span>
                         <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-0.5">
                           {new Date(sale.created_at).toLocaleString('es-PE', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}

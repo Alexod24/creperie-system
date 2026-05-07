@@ -20,6 +20,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const router = useRouter();
   const pathname = usePathname();
 
+  // Usar refs para tener acceso al estado más reciente en callbacks de eventos
+  const userRef = React.useRef<any>(null);
+  const loadingRef = React.useRef(true);
+
   const updateLastActivity = useCallback(() => {
     if (typeof window !== "undefined") {
       localStorage.setItem("lastActivity", Date.now().toString());
@@ -31,7 +35,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await supabase.auth.signOut();
       setUser(null);
       setRole(null);
-      // Usar window.location para asegurar un refresco total de estado al salir
+      userRef.current = null;
       window.location.href = "/signin";
     } catch (err) {
       console.error("Logout error:", err);
@@ -39,62 +43,89 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Función unificada para cargar el perfil completo
+  const loadFullProfile = async (sessionUser: any) => {
+    if (!sessionUser) {
+      setUser(null);
+      setRole(null);
+      userRef.current = null;
+      return;
+    }
+
+    // Si es el mismo usuario que ya tenemos, no hacemos nada
+    if (userRef.current?.id === sessionUser.id) return;
+
+    setUser(sessionUser);
+    userRef.current = sessionUser;
+    updateLastActivity();
+
+    try {
+      const { data: roleData } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', sessionUser.id)
+        .single();
+      
+      setRole(roleData?.role || null);
+    } catch (err) {
+      console.error("Error fetching role:", err);
+    }
+  };
+
   useEffect(() => {
     let isMounted = true;
 
-    const checkInitialSession = async () => {
+    const initializeAuth = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!isMounted) return;
+        setLoading(true);
+        loadingRef.current = true;
 
-        if (session?.user) {
-          setUser(session.user);
-          const { data: roleData } = await supabase
-            .from('users')
-            .select('role')
-            .eq('id', session.user.id)
-            .single();
-          if (isMounted) setRole(roleData?.role || null);
+        // 1. Obtener sesión inicial
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (isMounted) {
+          if (session?.user) {
+            await loadFullProfile(session.user);
+          }
         }
       } catch (err) {
         console.error("Auth init error:", err);
       } finally {
-        if (isMounted) setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+          loadingRef.current = false;
+        }
       }
     };
 
-    checkInitialSession();
+    initializeAuth();
 
+    // 2. Escuchar cambios de estado
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!isMounted) return;
       
-      console.log("AuthContext Event:", event, session?.user?.email || "none");
-      const currentUser = session?.user ?? null;
-
-      // Solo actualizar si el ID cambia para evitar bucles
-      if (user?.id !== currentUser?.id) {
-        setUser(currentUser);
-        if (currentUser) {
-          updateLastActivity();
-          const { data: roleData } = await supabase
-            .from('users')
-            .select('role')
-            .eq('id', currentUser.id)
-            .single();
-          if (isMounted) setRole(roleData?.role || null);
-        } else {
-          setRole(null);
-        }
+      console.log(`AuthContext Event: ${event} | User: ${session?.user?.email || "none"}`);
+      
+      if (session?.user) {
+        await loadFullProfile(session.user);
+      } else {
+        setUser(null);
+        setRole(null);
+        userRef.current = null;
       }
 
-      if (isMounted && loading) setLoading(false);
+      // Asegurar que loading sea false tras el primer evento
+      if (loadingRef.current) {
+        setLoading(false);
+        loadingRef.current = false;
+      }
     });
 
     return () => {
       isMounted = false;
       subscription.unsubscribe();
     };
-  }, []); // Mantener dependencias vacías para registro único
+  }, []);
 
   return (
     <AuthContext.Provider value={{ user, loading, role, logout }}>

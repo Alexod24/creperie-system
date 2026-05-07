@@ -35,12 +35,26 @@ export default function CashModule() {
   const [searchTerm, setSearchTerm] = useState("");
   const [dateFilter, setDateFilter] = useState("");
 
+  const dateInputRef = React.useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     if (activeSession) {
       fetchSessionTotals();
     }
     fetchHistory();
   }, [activeSession]);
+
+  const openDatePicker = () => {
+    if (dateInputRef.current) {
+      try {
+        // @ts-ignore
+        dateInputRef.current.showPicker();
+      } catch (e) {
+        dateInputRef.current.focus();
+        dateInputRef.current.click();
+      }
+    }
+  };
 
   const fetchSessionTotals = async () => {
     if (!activeSession) return;
@@ -259,9 +273,16 @@ export default function CashModule() {
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
-              <div className="relative">
-                <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <div className="relative group">
+                <button 
+                  onClick={openDatePicker}
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-brand-600 transition-colors z-10"
+                  title="Seleccionar fecha"
+                >
+                  <Calendar className="w-4 h-4" />
+                </button>
                 <input 
+                  ref={dateInputRef}
                   type="date" 
                   className="pl-11 pr-4 py-3 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl text-xs font-bold focus:ring-2 focus:ring-brand-500 outline-none"
                   value={dateFilter}
@@ -304,7 +325,11 @@ export default function CashModule() {
                     return (
                       <tr key={session.id} className="group hover:bg-gray-50 dark:hover:bg-gray-900/40 transition-all duration-300">
                         <td className="px-8 py-6">
-                          <div className="flex flex-col">
+                          <div 
+                            className="flex flex-col cursor-pointer hover:opacity-70 transition-opacity"
+                            onClick={() => setDateFilter(session.closed_at.split('T')[0])}
+                            title="Filtrar por este día"
+                          >
                             <span className="text-sm font-black text-gray-900 dark:text-white">
                               {new Date(session.closed_at).toLocaleDateString("es-PE", { day: '2-digit', month: 'short', year: 'numeric' })}
                             </span>
